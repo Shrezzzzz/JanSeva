@@ -1,0 +1,179 @@
+// JanSeva — Prisma schema (PostgreSQL)
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum Category {
+  Pothole
+  Streetlight
+  WaterLeak
+  WasteDump
+  Sewage
+  RoadDamage
+  ParkIssue
+  Other
+}
+
+enum Severity {
+  Low
+  Medium
+  High
+  Critical
+}
+
+enum Status {
+  Reported
+  Verified
+  Assigned
+  InProgress
+  Resolved
+  Closed
+}
+
+enum Role {
+  Citizen
+  Moderator
+  Authority
+  Admin
+}
+
+// ── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  citizenId    String    @unique
+  name         String
+  email        String    @unique
+  password     String
+  role         Role      @default(Citizen)
+  ward         String?
+  avatarUrl    String?
+  xp           Int       @default(0)
+  level        Int       @default(1)
+  badges       String[]
+  reportStreak Int       @default(0)
+
+  issues       Issue[]
+  comments     Comment[]
+  pet          Pet?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([email])
+  @@index([xp(sort: Desc)])
+  @@index([citizenId])
+}
+
+model Pet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   @default("Nagar")
+  stage     Int      @default(0)
+  mood      String   @default("happy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Issue {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?
+  category     Category
+  severity     Severity  @default(Medium)
+  status       Status    @default(Reported)
+
+  latitude     Float
+  longitude    Float
+  address      String?
+  zone         String?
+
+  mediaUrls    String[]
+  isAnonymous  Boolean   @default(false)
+
+  reporterId   String?
+  reporter     User?     @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+
+  upvotes      Int       @default(0)
+  verifiedBy   String[]
+
+  duplicateOf  String?
+
+  // AI metadata
+  aiCategory              String?
+  aiConfidence            Float?
+  aiSeverity              String?
+  estimatedResolutionDays Int?
+  department              String?
+
+  comments     Comment[]
+  timeline     Timeline[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([zone])
+  @@index([latitude, longitude])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  sentiment String?
+
+  issueId   String
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([issueId])
+}
+
+model Timeline {
+  id        String   @id @default(cuid())
+  event     String
+  actor     String
+  actorRole Role
+  note      String?
+  mediaUrl  String?
+
+  issueId   String
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([issueId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  issueId   String?
+  type      String
+  read      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
