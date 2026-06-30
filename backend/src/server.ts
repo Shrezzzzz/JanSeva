@@ -21,7 +21,7 @@ import { logger } from './utils/logger';
 import { generateDailyMissionsForAllUsers } from './services/missionService';
 
 const app  = express();
-const PORT = parseInt(process.env.PORT ?? '3001');
+const PORT = Number(process.env.PORT) || 3001;
 
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET must be set in production');
@@ -63,7 +63,25 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(generalLimiter);
 
 // ── Health check ──────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+app.get('/health', (_req, res) =>
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+  })
+);
+
+// Root endpoint (for Render health checks)
+app.get('/', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'JanSeva Backend',
+    message: 'API is running',
+  });
+});
+
+app.head('/', (_req, res) => {
+  res.sendStatus(200);
+});
 
 // ── Global SSE stream for new issues ─────────────────────────────────────────
 const sseClients = new Set<express.Response>();
