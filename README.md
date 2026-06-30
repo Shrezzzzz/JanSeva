@@ -1,184 +1,388 @@
-# JanSeva 🏛️
+# 🏛️ JanSeva
 
-> *Jan = People | Seva = Service*
-> **Report. Verify. Resolve. Together.**
+> **Jan = People • Seva = Service**
+>
+> **AI-Powered Smart Civic Issue Reporting & Resolution Platform**
 
-A citizen-powered civic issue reporting platform for Indian cities — built with AI-assisted categorization, community verification, real-time tracking, and gamified engagement.
+JanSeva is a full-stack AI-powered civic issue reporting platform that connects **citizens** and **government authorities** through a transparent digital workflow.
 
----
-
-## What It Does
-
-JanSeva lets citizens report infrastructure problems (potholes, broken streetlights, water leaks, sewage overflow, waste dumping) using their phone camera. The platform:
-
-- **Auto-categorizes** your photo using Groq + LLaMA 3 Vision in under 2 seconds
-- **Detects duplicates** before a report is created, reducing noise
-- **Geo-pins** every issue on a live interactive map
-- **Community verifies** — 10 upvotes auto-escalates an issue to the municipality
-- **Tracks resolution** through a 6-stage pipeline with a full audit timeline
-- **Gamifies civic action** — XP, badges, leaderboards, streaks
-- **Predicts** monsoon-season hotspots and weekend failure patterns using aggregated AI insights
+Citizens can report infrastructure issues with images and location, while AI automatically categorizes, prioritizes, and assigns cases to the appropriate departments. Authorities receive intelligent dashboards, analytics, and workflow management tools to resolve issues efficiently.
 
 ---
 
-## AI Features (Groq + LLaMA 3)
+# 🌟 Features
 
-| Feature | Model | Description |
-|---|---|---|
-| Photo categorization | `llama-3.2-11b-vision-preview` | Identifies issue type, severity, department from a photo |
-| Text categorization | `llama-3.3-70b-versatile` | Same from description text |
-| Duplicate detection | `llama-3.3-70b-versatile` | Prevents repeat submissions for nearby issues |
-| Predictive insights | `llama-3.3-70b-versatile` | 3 data-backed action recommendations for authorities |
-| Comment sentiment | `llama-3.3-70b-versatile` | Flags frustrated/urgent comments for auto-escalation |
+## 👥 Citizen Portal
 
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | React 19 + Vite + TypeScript + Tailwind CSS |
-| State | Zustand |
-| Maps | Leaflet.js + OpenStreetMap (CartoDB Voyager tiles) |
-| Charts | Recharts |
-| AI | Groq API (llama-3.3-70b + llama-3.2-11b-vision) |
-| Backend | Node.js + Express + TypeScript |
-| Database | PostgreSQL + Prisma ORM |
-| File Storage | Cloudinary |
-| Auth | JWT (bcryptjs) |
-| PWA | vite-plugin-pwa + Workbox |
+- Secure JWT Authentication
+- Report civic issues with images
+- GPS based location detection
+- Interactive issue map
+- AI-powered issue categorization
+- Real-time issue tracking
+- Personal dashboard
+- Edit submitted reports
+- Community leaderboard
+- XP progression system
+- Avatar progression system
+- Daily missions
+- Profile management
 
 ---
 
-## Project Structure
+## 🏢 Authority Portal
+
+Dedicated login for municipal authorities.
+
+Authorities can
+
+- View department-specific cases
+- AI-assisted issue assignment
+- Verify reports
+- Update issue status
+- Resolve cases
+- Monitor city analytics
+- Track performance
+- View recent activities
+- Manage workflow
+
+---
+
+## 🤖 AI Features
+
+JanSeva combines **Google Gemini** and **Groq LLMs** to automate civic issue management.
+
+### AI Capabilities
+
+- Image understanding
+- Issue categorization
+- Severity estimation
+- Department assignment
+- Duplicate issue detection
+- Resolution recommendations
+- Authority summaries
+- Civic intelligence insights
+- Smart analytics generation
+
+---
+
+# 🚦 Issue Resolution Workflow
 
 ```
-janseva/
-├── src/                    # React frontend
-│   ├── components/         # UI, layout, hero, roadmap, report, map, issue, dashboard, gamification, auth
-│   ├── pages/              # LandingPage, ReportPage, MapPage, TrackPage, DashboardPage, GamificationPage, AdminPage, ProfilePage
-│   ├── hooks/              # useGeolocation, useGroqAI, useIssues, useAuth, useUpvote …
-│   ├── services/           # api, groq, issueService, authService, uploadService, analyticsService
-│   ├── store/              # Zustand: authStore, issueStore, mapStore, uiStore
-│   ├── types/              # issue.types, user.types, api.types, map.types
-│   ├── utils/              # formatters, validators, geoUtils, xpCalculator, constants, mockData
-│   └── config/             # env, groqConfig, routes
+Citizen Reports Issue
+          │
+          ▼
+AI Analysis
+(Category • Severity • Department)
+          │
+          ▼
+Locate
+          │
+          ▼
+Verify
+          │
+          ▼
+Assign
+          │
+          ▼
+In Progress
+          │
+          ▼
+Resolved
+```
+
+Every issue maintains a complete timeline from creation to resolution.
+
+---
+
+# 🏆 Gamification
+
+Citizens earn rewards for participating.
+
+Features include
+
+- XP System
+- Avatar Progression
+- Leaderboards
+- Achievement Badges
+- Daily Missions
+- Community Rankings
+
+---
+
+# 📊 Analytics Dashboard
+
+Authorities can monitor
+
+- Total Issues
+- Active Issues
+- Resolution Rate
+- Department Performance
+- Category Distribution
+- Resolution Trends
+- AI Insights
+- City-wide Statistics
+
+---
+
+# 🛠 Tech Stack
+
+## Frontend
+
+- React 19
+- Vite
+- TypeScript
+- Tailwind CSS
+- Zustand
+- React Router
+- Recharts
+- Leaflet Maps
+- Lucide Icons
+
+---
+
+## Backend
+
+- Node.js
+- Express
+- TypeScript
+- Prisma ORM
+- PostgreSQL
+- JWT Authentication
+- Cloudinary
+- Multer
+
+---
+
+## AI
+
+- Google Gemini
+- Groq API
+- Llama Models
+
+---
+
+## Database
+
+- PostgreSQL
+- Prisma ORM
+
+---
+
+## Deployment
+
+- Render
+- Neon PostgreSQL
+- Cloudinary
+
+---
+
+# 📂 Project Structure
+
+```
+JanSeva/
+│
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── services/
+│   ├── hooks/
+│   ├── store/
+│   ├── utils/
+│   ├── types/
+│   └── assets/
+│
 ├── backend/
+│   ├── prisma/
 │   ├── src/
-│   │   ├── routes/         # auth, issues, upload, analytics, ai, users
-│   │   ├── controllers/    # authController, issueController, aiController, analyticsController
-│   │   ├── middleware/     # auth (JWT), rateLimit, upload (multer), errorHandler
-│   │   ├── services/       # groqService, geoService, xpService, notificationService
-│   │   └── utils/          # logger, validators, seedData (50+ demo issues)
-│   └── prisma/
-│       └── schema.prisma   # User, Issue, Comment, Timeline, Notification
-└── public/                 # PWA manifest, icons
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   ├── ai/
+│   │   └── utils/
+│   │
+│   └── package.json
+│
+├── public/
+│
+└── README.md
 ```
 
 ---
 
-## Quick Start
+# 🚀 Installation
 
-### Prerequisites
-
-- Node.js 18+
-- PostgreSQL 14+ (or use a free [Neon](https://neon.tech) / [Supabase](https://supabase.com) instance)
-- A free [Groq API key](https://console.groq.com)
-
-### 1 — Clone and install
+Clone the repository
 
 ```bash
-git clone https://github.com/your-username/janseva
-cd janseva
+git clone https://github.com/Shrezzzzz/JanSeva.git
 
-# Frontend deps
+cd JanSeva
+```
+
+Install frontend
+
+```bash
 npm install
-
-# Backend deps
-cd backend && npm install && cd ..
 ```
 
-### 2 — Configure environment
-
-```bash
-cp .env.example .env
-# Edit .env and add:
-#   VITE_GROQ_API_KEY=gsk_...
-#   DATABASE_URL=postgresql://...
-#   JWT_SECRET=<long random string>
-#   GROQ_API_KEY=gsk_...
-```
-
-### 3 — Set up the database
+Install backend
 
 ```bash
 cd backend
-npx prisma migrate dev --name init   # create tables
-npm run db:seed                       # seed 50 demo issues
-cd ..
+
+npm install
 ```
 
-### 4 — Run (two terminals)
+---
+
+# 🗄 Database Setup
+
+Generate Prisma Client
 
 ```bash
-# Terminal 1 — Frontend
-npm run dev          # http://localhost:5173
+npx prisma generate
+```
 
-# Terminal 2 — Backend
-cd backend
-npm run dev          # http://localhost:3001
+Apply database schema
+
+```bash
+npx prisma migrate deploy
+```
+
+or during development
+
+```bash
+npx prisma db push
 ```
 
 ---
 
-## Demo Credentials
+# ▶️ Run Locally
 
-After running `npm run db:seed`:
+Frontend
 
-| Role | Email | Password |
-|---|---|---|
-| Citizen | `citizen1@janseva.in` | `Demo@1234` |
-| Authority | `authority@janseva.in` | `Demo@1234` |
+```bash
+npm run dev
+```
 
----
+Backend
 
-## API Reference
+```bash
+cd backend
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` | Create citizen account |
-| `POST` | `/api/auth/login` | Login, returns JWT |
-| `GET` | `/api/auth/me` | Current user profile |
-| `GET` | `/api/issues` | List issues (filters, pagination) |
-| `POST` | `/api/issues` | Report new issue |
-| `GET` | `/api/issues/:id` | Issue detail with timeline |
-| `PATCH` | `/api/issues/:id/status` | Update status (authority) |
-| `POST` | `/api/issues/:id/upvote` | Verify an issue |
-| `POST` | `/api/issues/:id/comments` | Add comment |
-| `GET` | `/api/issues/map` | Issues in bounding box |
-| `GET` | `/api/issues/nearby` | Issues within radius |
-| `POST` | `/api/upload` | Upload media (Cloudinary) |
-| `GET` | `/api/analytics/summary` | City-wide stats |
-| `GET` | `/api/analytics/insights` | AI-generated insights |
-| `GET` | `/api/analytics/leaderboard` | Top citizens |
-| `POST` | `/api/ai/categorize` | Groq text categorization |
-| `POST` | `/api/ai/sentiment` | Comment sentiment analysis |
-| `GET` | `/api/events` | SSE stream for live issue feed |
+npm run dev
+```
 
 ---
 
-## Key Design Decisions
+# 📡 API Modules
 
-**Frontend-first demo mode** — every page falls back to rich mock data when the backend is unavailable, making it safe to demo without a live database.
+### Authentication
 
-**Groq over OpenAI** — sub-2s inference on LLaMA 3 means photo categorization feels instant in the report flow.
+- Login
+- Register
+- Profile
 
-**Leaflet over Mapbox** — zero cost, no token required for hackathon demoing. Swap the tile URL in `constants.ts` for CartoDB Voyager (already configured).
+### Issues
 
-**Zustand over Redux** — minimal boilerplate for a focused hackathon codebase.
+- Create Issue
+- Update Issue
+- Track Issue
+- Issue Timeline
+- Nearby Issues
 
-**CSS custom properties + Tailwind** — design tokens in CSS variables mean the colour system is editable in one file (`theme.css`).
+### Upload
+
+- Cloudinary Image Upload
+
+### AI
+
+- Image Analysis
+- Categorization
+- Department Assignment
+- AI Insights
+
+### Analytics
+
+- Dashboard Statistics
+- Trends
+- Reports
+
+### Missions
+
+- Daily Citizen Missions
 
 ---
 
-*Built with ❤️ for civic-minded communities across India.*
+# 🔐 Authentication
+
+- JWT Authentication
+- Role-based Authorization
+- Citizen Access
+- Authority Access
+- Department Permissions
+
+---
+
+# 🎯 Future Scope
+
+- Mobile Application
+- Push Notifications
+- AI Chat Assistant
+- Multi-language Support
+- IoT Sensor Integration
+- Predictive Maintenance
+- Smart City Dashboard
+- Government API Integration
+
+---
+
+# 🤝 Contributing
+
+1. Fork the repository
+
+2. Create a new branch
+
+```bash
+git checkout -b feature-name
+```
+
+3. Commit changes
+
+```bash
+git commit -m "Added new feature"
+```
+
+4. Push
+
+```bash
+git push origin feature-name
+```
+
+5. Open a Pull Request
+
+---
+
+# 👩‍💻 Developed By
+
+**Shreya Chowdhury**
+
+B.Tech CSE (IoT)
+
+GitHub:
+https://github.com/Shrezzzzz
+
+LinkedIn:
+https://www.linkedin.com/in/shreya-chowdhury-b81988293
+
+---
+
+# ⭐ If you like this project
+
+Give this repository a ⭐ on GitHub!
+
+---
+
+## Built for smarter cities, empowered citizens, and AI-driven governance.
