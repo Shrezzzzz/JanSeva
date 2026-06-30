@@ -52,6 +52,7 @@ export interface UploadResponse {
 
 export interface AnalyticsSummary {
   totalIssues: number;
+  activeIssues: number;
   resolvedIssues: number;
   resolutionRate: number;
   avgResolutionDays: number;
@@ -61,7 +62,9 @@ export interface AnalyticsSummary {
     resolved: TrendPoint[];
   };
   byCategory: CategoryStat[];
+  severityDistribution: SeverityStat[];
   byZone: ZoneStat[];
+  wardDistribution: ZoneStat[];
 }
 
 export interface TrendPoint {
@@ -74,6 +77,11 @@ export interface CategoryStat {
   count: number;
   resolved: number;
   color: string;
+}
+
+export interface SeverityStat {
+  severity: string;
+  count: number;
 }
 
 export interface ZoneStat {

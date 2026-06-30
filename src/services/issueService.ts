@@ -58,6 +58,11 @@ export async function upvoteIssue(id: string): Promise<{ upvotes: number }> {
   return res.data.data;
 }
 
+export async function joinDuplicateIssue(id: string): Promise<Issue> {
+  const res = await api.post<ApiResponse<Issue>>(`/issues/${id}/join-duplicate`);
+  return res.data.data;
+}
+
 export async function addComment(issueId: string, content: string): Promise<import('../types/issue.types').Comment> {
   const res = await api.post<ApiResponse<import('../types/issue.types').Comment>>(`/issues/${issueId}/comments`, { content });
   return res.data.data;

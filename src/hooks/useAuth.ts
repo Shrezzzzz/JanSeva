@@ -35,7 +35,18 @@ export function useAuth() {
   const refreshUser = useCallback(async () => {
     try {
       const u = await getMe();
-      setUser({ id: u.id, name: u.name, email: u.email, role: u.role, ward: u.ward, avatarUrl: u.avatarUrl, xp: u.xp, level: u.level });
+      setUser({
+        id: u.id,
+        citizenId: u.citizenId,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        ward: u.ward,
+        avatarUrl: u.avatarUrl,
+        xp: u.xp,
+        level: u.level,
+        activeCharacter: u.activeCharacter,
+      });
     } catch { /* token invalid — ignore */ }
   }, [setUser]);
 

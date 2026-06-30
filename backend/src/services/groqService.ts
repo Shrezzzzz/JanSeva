@@ -48,6 +48,25 @@ export async function categorizeIssue(description: string) {
   return safeParse(chat.choices[0]?.message?.content ?? '');
 }
 
+export async function categorizeIssueFromImage(base64: string, mimeType = 'image/jpeg') {
+  const chat = await groq.chat.completions.create({
+    model: process.env.GROQ_VISION_MODEL || 'llama-3.2-90b-vision-preview',
+    messages: [
+      { role: 'system', content: CATEGORIZE_PROMPT },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Analyze this civic infrastructure image and categorize the issue.' },
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+        ],
+      },
+    ],
+    temperature: 0.2,
+    max_tokens:  300,
+  });
+  return safeParse(chat.choices[0]?.message?.content ?? '');
+}
+
 export async function generateInsights(statsJson: string) {
   const chat = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',

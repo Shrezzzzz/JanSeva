@@ -26,6 +26,31 @@
   .font-body    { font-family: var(--font-body);    }
 }
 
+.brand-logo {
+  display: inline-flex;
+  align-items: flex-start;
+  font-family: var(--font-logo);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 0.78;
+  white-space: nowrap;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+.brand-logo__word {
+  display: inline-block;
+}
+
+.brand-logo__mark {
+  margin-left: 0.05em;
+  font-family: var(--font-logo);
+  font-size: 0.32em;
+  font-weight: 500;
+  line-height: 1;
+  transform: translateY(0.08em);
+}
+
 /* ── Leaflet custom tooltip ── */
 .leaflet-tooltip-custom {
   background: white !important;

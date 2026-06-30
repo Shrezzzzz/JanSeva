@@ -12,6 +12,7 @@ export default function Leaderboard({ entries }: { entries: LeaderboardEntry[] }
     <div className="space-y-2">
       {entries.map((e) => {
         const isMe = user?.id === e.userId;
+        const displayName = e.name?.trim() || 'Anonymous Citizen';
         return (
           <div
             key={e.userId}
@@ -29,11 +30,18 @@ export default function Leaderboard({ entries }: { entries: LeaderboardEntry[] }
             </div>
 
             {/* Avatar + name */}
-            <Avatar src={e.avatarUrl} name={e.name} size="md" ring={isMe} />
+            <Avatar
+              src={e.avatarUrl}
+              name={displayName}
+              size="md"
+              ring={isMe}
+              activeCharacter={e.activeCharacter}
+            />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm font-medium text-[#0D0D0B] truncate">
-                  {e.name} {isMe && <span className="text-xs text-[#1A6B3C]">(you)</span>}
+                  {displayName}
+                  {isMe && <span className="text-xs text-[#1A6B3C] ml-1">(You)</span>}
                 </p>
                 {e.citizenId && (
                   <span className="font-mono text-[10px] text-[#6F6F6F] bg-[#F7F7F5] border border-[#E5E5E0] px-1.5 py-0.5 rounded flex-shrink-0">

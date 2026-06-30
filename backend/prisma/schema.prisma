@@ -2,7 +2,8 @@
 // Run: npx prisma migrate dev --name init
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -34,7 +35,11 @@ enum Status {
   Reported
   Verified
   Assigned
+  Accepted
   InProgress
+  Completed
+  NeedsVerification
+  Rejected
   Resolved
   Closed
 }
@@ -57,14 +62,14 @@ model User {
   role         Role      @default(Citizen)
   ward         String?
   avatarUrl    String?
-  xp           Int       @default(0)
-  level        Int       @default(1)
-  badges       String[]
-  reportStreak Int       @default(0)
+  xp              Int       @default(0)
+  level           Int       @default(1)
+  badges          String[]
+  reportStreak    Int       @default(0)
+  activeCharacter String    @default("male-0-explorer")
 
   issues       Issue[]
   comments     Comment[]
-  pet          Pet?
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -72,20 +77,6 @@ model User {
   @@index([email])
   @@index([xp(sort: Desc)])
   @@index([citizenId])
-}
-
-model Pet {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String   @default("Nagar")
-  stage     Int      @default(0)
-  mood      String   @default("happy")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
 }
 
 model Issue {
@@ -111,13 +102,35 @@ model Issue {
   verifiedBy   String[]
 
   duplicateOf  String?
+  duplicateConfidence Float?
 
   // AI metadata
   aiCategory              String?
   aiConfidence            Float?
   aiSeverity              String?
   estimatedResolutionDays Int?
+  resolutionConfidence    Float?
+  resolutionReason        String?
   department              String?
+  departmentConfidence    Float?
+  departmentReason        String?
+  priorityScore           Int?
+  priorityLabel           String?
+  priorityReason          String?
+  citizenGuidance         Json?
+  authoritySummary        String?
+  aiNotifications         Json?
+  workflowRecommendation  Json?
+  communityInsight        Json?
+  heatmapInsight          Json?
+  aiModelUsed             String?
+  aiAnalyzedAt            DateTime?
+  aiFailureReason         String?
+
+  assignedTo              String?
+  completionNotes         String?
+  completionPhotos        String[]
+  internalNotes           InternalNote[]
 
   comments     Comment[]
   timeline     Timeline[]
@@ -128,8 +141,19 @@ model Issue {
   @@index([status])
   @@index([category])
   @@index([zone])
+  @@index([priorityScore(sort: Desc)])
   @@index([latitude, longitude])
   @@index([createdAt(sort: Desc)])
+}
+
+model InternalNote {
+  id         String   @id @default(cuid())
+  issueId    String
+  issue      Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  authorId   String
+  authorName String
+  content    String
+  createdAt  DateTime @default(now())
 }
 
 model Comment {
@@ -176,4 +200,22 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model Mission {
+  id          String   @id @default(cuid())
+  userId      String
+  date        String   // YYYY-MM-DD
+  category    Category
+  title       String
+  description String
+  xpReward    Int      @default(30)
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([date])
+  @@unique([userId, date, category])
 }

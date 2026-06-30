@@ -9,10 +9,11 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
   const status = (err as { status?: number }).status ?? 500;
   res.status(status).json({
     success: false,
-    error: status === 500 ? 'Internal server error' : err.message,
+    error: status === 500 ? 'Something went wrong. Please try again.' : err.message,
   });
 }
 
 export function notFound(req: Request, res: Response) {
-  res.status(404).json({ success: false, error: `Route ${req.method} ${req.path} not found` });
+  logger.error(`Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({ success: false, error: 'The requested resource was not found.' });
 }

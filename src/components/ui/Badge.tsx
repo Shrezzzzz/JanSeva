@@ -10,7 +10,7 @@ interface BadgeProps {
 
 export function StatusBadge({ status, className }: { status: IssueStatus; className?: string }) {
   const color = STATUS_COLORS[status];
-  const label = STATUS_LABELS[status];
+  const label = STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status;
   return (
     <span
       className={clsx('inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium', className)}

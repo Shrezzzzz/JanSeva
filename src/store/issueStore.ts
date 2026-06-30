@@ -31,7 +31,7 @@ const DEFAULT_FILTERS: IssueFilters = {
   dateRange:  '30d',
 };
 
-export const useIssueStore = create<IssueState>((set, get) => ({
+export const useIssueStore = create<IssueState>((set) => ({
   issues:        [],
   selectedIssue: null,
   filters:       DEFAULT_FILTERS,

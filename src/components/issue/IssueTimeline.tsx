@@ -1,6 +1,5 @@
 import type { TimelineEvent } from '../../types/issue.types';
 import { formatDateTime } from '../../utils/formatters';
-import Avatar from '../ui/Avatar';
 
 const EVENT_STYLE: Record<string, { dot: string; icon: string }> = {
   reported:  { dot: 'bg-[#9CA3AF]', icon: '🟢' },

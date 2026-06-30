@@ -8,7 +8,6 @@ import { fetchAnalyticsSummary, fetchAIInsights } from '../../services/analytics
 import type { AnalyticsSummary, AIInsight } from '../../types/api.types';
 import Spinner from '../ui/Spinner';
 import Button from '../ui/Button';
-import { MOCK_ANALYTICS } from '../../utils/mockData';
 
 type Range = '7d' | '30d' | '90d' | '1y';
 
@@ -18,24 +17,45 @@ export default function ImpactDashboard() {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [aiLoading,setAiLoading]= useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+  const [aiError,  setAiError]  = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     fetchAnalyticsSummary(range)
       .then(setData)
-      .catch(() => setData(MOCK_ANALYTICS))
+      .catch((err) => {
+        setData(null);
+        setError(err instanceof Error ? err.message : 'Unable to load analytics.');
+      })
       .finally(() => setLoading(false));
   }, [range]);
 
   async function refreshInsights() {
     setAiLoading(true);
-    try { const i = await fetchAIInsights(); setInsights(i); }
-    catch { /* silently use empty */ }
-    finally { setAiLoading(false); }
+    setAiError(null);
+    try {
+      const i = await fetchAIInsights();
+      setInsights(i);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Could not generate insights right now.');
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size={32} className="text-[#1A6B3C]" /></div>;
+  if (error) {
+    return (
+      
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+        {error}
+      </div>
+    );
+  }
   if (!data) return null;
+  console.log("Analytics data:", data);
 
   const RANGES: { v: Range; l: string }[] = [
     { v: '7d', l: '7 Days' }, { v: '30d', l: 'Month' },
@@ -43,6 +63,7 @@ export default function ImpactDashboard() {
   ];
 
   return (
+    
     <div className="space-y-8">
       {/* Range toggle */}
       <div className="flex gap-2 flex-wrap">
@@ -60,7 +81,7 @@ export default function ImpactDashboard() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Issues" value={data.totalIssues.toLocaleString()} icon={BarChart2} trend={12} />
         <StatCard title="Resolved" value={data.resolvedIssues.toLocaleString()} subtitle={`${(data.resolutionRate * 100).toFixed(0)}% rate`} icon={CheckCircle} accentColor="#1A6B3C" trend={8} />
         <StatCard title="Avg Resolution" value={`${data.avgResolutionDays.toFixed(1)} days`} icon={Clock} accentColor="#D97706" trend={-5} />
@@ -68,6 +89,7 @@ export default function ImpactDashboard() {
       </div>
 
       {/* Charts row */}
+     
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 bg-white rounded-2xl border border-[#E5E5E0] p-5">
           <h3 className="font-medium text-[#0D0D0B] mb-4">Issues Over Time</h3>
@@ -78,7 +100,7 @@ export default function ImpactDashboard() {
           <CategoryDonut data={data.byCategory} />
         </div>
       </div>
-
+     
       {/* Zone leaderboard */}
       <div>
         <h3 className="font-display text-xl text-[#0D0D0B] mb-4">Zone Performance</h3>
@@ -93,7 +115,9 @@ export default function ImpactDashboard() {
             Refresh
           </Button>
         </div>
-        {insights.length === 0 ? (
+        {aiError ? (
+          <p className="text-sm text-red-600">{aiError}</p>
+        ) : insights.length === 0 ? (
           <p className="text-sm text-[#6F6F6F]">Click "Refresh" to generate AI-powered insights from the current data.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

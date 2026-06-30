@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef , useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 import { ROUTES } from '../../config/routes';
@@ -22,7 +22,7 @@ const STAGES: Stage[] = [
 ];
 
 // Evenly spaced X positions for 6 nodes in a 1100-wide SVG
-const NODE_X = STAGES.map((_, i) => 100 + i * 180); // 100, 280, 460, 640, 820, 1000
+const NODE_X = STAGES.map((_, i) => 120 + i * 170);
 const ROAD_Y = 100;
 const NODE_R = 28;
 
@@ -76,34 +76,45 @@ function SvgNode({ stage, cx, active, completed, onClick }: SvgNodeProps) {
 }
 
 export default function RoadmapTrack() {
-  const navigate   = useNavigate();
+  const navigate = useNavigate();
   const sectionRef = useRef<HTMLDivElement>(null);
-  const [active,    setActive]    = useState(0);
-  const [completed, setCompleted] = useState<number[]>([]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) startAnimation(); },
-      { threshold: 0.3 },
-    );
-    if (sectionRef.current) observer.observe(sectionRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  function startAnimation() {
-    let step = 0;
-    const iv = setInterval(() => {
-      setActive(step);
-      if (step > 0) setCompleted((c) => (c.includes(step - 1) ? c : [...c, step - 1]));
-      step += 1;
-      if (step >= STAGES.length) clearInterval(iv);
-    }, 600);
-  }
-
-  const dotX = NODE_X[active];
+  const [currentStage, setCurrentStage] = useState(0);
+  const intervalRef = useRef<number | null>(null);
 
   return (
-    <section ref={sectionRef} className="bg-[#F7F7F5] py-20 overflow-hidden">
+    <section
+      ref={sectionRef}
+      className="bg-[#F7F7F5] py-20 overflow-hidden"
+      onMouseEnter={() => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+
+        let step = 0;
+        setCurrentStage(0);
+
+        intervalRef.current = window.setInterval(() => {
+          step++;
+          setCurrentStage(step);
+
+          if (step >= STAGES.length - 1) {
+            clearInterval(intervalRef.current!);
+          }
+        }, 400);
+      }}
+      onMouseLeave={() => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+
+        let step = currentStage;
+
+        intervalRef.current = window.setInterval(() => {
+          step--;
+          setCurrentStage(step);
+
+          if (step <= 0) {
+            clearInterval(intervalRef.current!);
+          }
+        }, 250);
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <div className="text-center mb-14">
@@ -117,52 +128,52 @@ export default function RoadmapTrack() {
         {/* ── Desktop: SVG road ── */}
         <svg
           viewBox="0 0 1100 160"
-          className="w-full hidden sm:block"
+          className="w-full h-auto hidden sm:block"
           aria-label="Civic issue roadmap"
           role="img"
         >
           {/* Road base — asphalt */}
           <rect x="0" y={ROAD_Y - 30} width="1100" height="60" rx="8" fill="#2C2C2A" />
 
-          {/* Lane dashes */}
-          {[80, 200, 320, 440, 560, 680, 800, 920, 1040].map((x) => (
-            <rect key={x} x={x} y={ROAD_Y - 3} width="60" height="6" rx="3" fill="white" opacity="0.35" />
-          ))}
-
-          {/* Progress fill between completed nodes */}
+          {/* Grey road */}
           {NODE_X.slice(0, -1).map((x, i) => (
-            <rect
-              key={i}
-              x={x}
-              y={ROAD_Y - 3}
-              width={completed.includes(i) ? NODE_X[i + 1] - x : 0}
-              height="6"
-              rx="3"
-              fill="#1A6B3C"
-              style={{ transition: 'width 0.6s ease' }}
+            <line
+              key={`grey-${i}`}
+              x1={x + NODE_R}
+              y1={ROAD_Y}
+              x2={NODE_X[i + 1] - NODE_R}
+              y2={ROAD_Y}
+              stroke="#BDBDBD"
+              strokeWidth="6"
+              strokeLinecap="round"
             />
           ))}
 
-          {/* Animated traveler dot */}
-          <circle
-            cx={dotX}
-            cy={ROAD_Y}
-            r={10}
-            fill="#1A6B3C"
-            style={{
-              transition: 'cx 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
-              filter: 'drop-shadow(0 0 8px rgba(26,107,60,0.85))',
-            }}
-          />
-
+          {/* Green completed segments */}
+          {NODE_X.slice(0, -1).map((x, i) => (
+            <line
+              key={`green-${i}`}
+              x1={x + NODE_R}
+              y1={ROAD_Y}
+              x2={NODE_X[i + 1] - NODE_R}
+              y2={ROAD_Y}
+              stroke="#1A6B3C"
+              strokeWidth="6"
+              strokeLinecap="round"
+              style={{
+                opacity: i < currentStage ? 1 : 0,
+                transition: 'opacity 0.25s ease',
+              }}
+            />
+          ))}
           {/* Stage nodes */}
           {STAGES.map((stage, i) => (
             <SvgNode
               key={stage.id}
               stage={stage}
               cx={NODE_X[i]}
-              active={active === i}
-              completed={completed.includes(i)}
+              active={i === currentStage}
+              completed={i < currentStage}
               onClick={() => navigate(stage.href)}
             />
           ))}
@@ -171,8 +182,9 @@ export default function RoadmapTrack() {
         {/* ── Mobile: vertical stack ── */}
         <div className="flex flex-col items-center gap-0 sm:hidden">
           {STAGES.map((stage, i) => {
-            const isCompleted = completed.includes(i);
-            const isActive    = active === i;
+          
+            const isCompleted = i < currentStage;
+            const isActive = i === currentStage;
             return (
               <div key={stage.id} className="flex flex-col items-center">
                 <button
@@ -209,11 +221,8 @@ export default function RoadmapTrack() {
 
         {/* Active stage description (desktop) */}
         <div className="mt-10 text-center min-h-[2rem] hidden sm:block">
-          <p className="text-sm text-[#6F6F6F] animate-fade-rise" key={active}>
-            <strong className="text-[#0D0D0B]">
-              Stage {active + 1} — {STAGES[active].label}:
-            </strong>{' '}
-            {STAGES[active].description}
+          <p className="text-sm text-[#6F6F6F]">
+            Hover over the roadmap to see the complete civic resolution journey.
           </p>
         </div>
       </div>

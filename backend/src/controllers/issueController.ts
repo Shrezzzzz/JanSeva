@@ -1,19 +1,20 @@
 import type { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Category, PrismaClient, Role } from '@prisma/client';
 import type { AuthRequest } from '../middleware/auth';
 import { getIssuesNearby, getIssuesInBounds } from '../services/geoService';
-import { checkDuplicate } from '../services/groqService';
 import { awardXP } from '../services/xpService';
+import { checkMissionCompletion } from '../services/missionService';
 import { notifyStatusUpdate } from '../services/notificationService';
 import { isValidCoords } from '../utils/validators';
 import { broadcastNewIssue } from '../server';
+import { analyzeIssue } from '../ai/decisionEngine';
 
 const prisma = new PrismaClient();
 
 // --- GET /api/issues ---
 export async function getIssues(req: Request, res: Response) {
   try {
-    const { categories, statuses, severities, dateRange, zone, q, page = '1', pageSize = '20' } = req.query as Record<string, string>;
+    const { categories, statuses, severities, dateRange, zone, q, reporterId, page = '1', pageSize = '20' } = req.query as Record<string, string>;
     const p = parseInt(page);
     const ps = Math.min(parseInt(pageSize), 100);
     const skip = (p - 1) * ps;
@@ -27,6 +28,7 @@ export async function getIssues(req: Request, res: Response) {
     if (statuses)   where.status   = { in: statuses.split(',') };
     if (severities) where.severity = { in: severities.split(',') };
     if (zone)       where.zone     = zone;
+    if (reporterId) where.reporterId = reporterId;
     if (cutoff)     where.createdAt = { gte: new Date(Date.now() - cutoff * 86400000) };
     if (q)          where.title    = { contains: q, mode: 'insensitive' };
 
@@ -77,8 +79,9 @@ export async function getNearbyIssues(req: Request, res: Response) {
 }
 
 // --- GET /api/issues/:id ---
-export async function getIssueById(req: Request, res: Response) {
+export async function getIssueById(req: AuthRequest, res: Response) {
   try {
+    const includeNotes = req.userRole === 'Authority' || req.userRole === 'Admin';
     const issue = await prisma.issue.findUnique({
       where: { id: req.params.id },
       include: {
@@ -88,6 +91,7 @@ export async function getIssueById(req: Request, res: Response) {
           orderBy: { createdAt: 'asc' },
         },
         timeline: { orderBy: { createdAt: 'asc' } },
+        ...(includeNotes ? { internalNotes: { orderBy: { createdAt: 'asc' } } } : {}),
       },
     });
     if (!issue) return res.status(404).json({ success: false, error: 'Issue not found' });
@@ -103,7 +107,6 @@ export async function createIssue(req: AuthRequest, res: Response) {
     const {
       title, description, category, severity = 'Medium', latitude, longitude,
       address, zone, mediaUrls = [], isAnonymous = false,
-      aiCategory, aiConfidence, aiSeverity, estimatedResolutionDays, department,
     } = req.body;
 
     if (!title || !category)
@@ -111,25 +114,11 @@ export async function createIssue(req: AuthRequest, res: Response) {
     if (!isValidCoords(latitude, longitude))
       return res.status(400).json({ success: false, error: 'Invalid coordinates' });
 
-    // Duplicate check — skip if Groq API key is not configured
-    const nearby = await getIssuesNearby(latitude, longitude, 200);
-    let dupResult = null;
-    if (nearby.length && process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here') {
-      dupResult = await checkDuplicate(
-        { title, description, category },
-        nearby.map((i) => ({ id: i.id, title: i.title, category: i.category })),
-      ).catch(() => null);
-    }
-
     const issue = await prisma.issue.create({
       data: {
         title, description, category, severity, latitude, longitude,
         address, zone, mediaUrls, isAnonymous,
         reporterId: req.userId ?? null,
-        aiCategory, aiConfidence, aiSeverity, estimatedResolutionDays, department,
-        duplicateOf: (dupResult as { isDuplicate?: boolean; duplicateId?: string | null } | null)?.isDuplicate && (dupResult as { confidence: number } | null)?.confidence as number > 0.8
-          ? (dupResult as { duplicateId?: string | null })?.duplicateId ?? null
-          : null,
       },
     });
 
@@ -143,17 +132,71 @@ export async function createIssue(req: AuthRequest, res: Response) {
       },
     });
 
-    // Award XP
-    if (req.userId) await awardXP(req.userId, 20);
+    // Award XP + check missions
+    if (req.userId) {
+      await awardXP(req.userId, 20);
+      await checkMissionCompletion(req.userId, category as Category).catch(() => null);
+    }
 
     // Broadcast to SSE clients
     broadcastNewIssue(issue);
 
-    return res.status(201).json({ success: true, data: issue });
+    try {
+      await analyzeIssue(issue.id);
+    } catch (error) {
+      console.error('AI enrichment failed; report remains submitted:', error);
+    }
+
+    const enrichedIssue = await prisma.issue.findUnique({ where: { id: issue.id } });
+
+    return res.status(201).json({ success: true, data: enrichedIssue ?? issue });
   } catch (e) {
-    const msg = (e instanceof Error) ? e.message : 'Failed to create issue';
     console.error('createIssue error:', e);
+    const msg = 'Something went wrong while submitting your report. Please try again.';
     return res.status(500).json({ success: false, error: msg, message: msg });
+  }
+}
+
+// --- POST /api/issues/:id/join-duplicate ---
+export async function joinDuplicateIssue(req: AuthRequest, res: Response) {
+  try {
+    const duplicate = await prisma.issue.findUnique({ where: { id: req.params.id } });
+    if (!duplicate) return res.status(404).json({ success: false, error: 'Issue not found' });
+    if (!duplicate.duplicateOf) {
+      return res.status(409).json({ success: false, error: 'No linked duplicate report found' });
+    }
+
+    const original = await prisma.issue.findUnique({ where: { id: duplicate.duplicateOf } });
+    if (!original) return res.status(404).json({ success: false, error: 'Original issue not found' });
+
+    const alreadyVerified = req.userId ? original.verifiedBy.includes(req.userId) : false;
+    const updatedOriginal = await prisma.issue.update({
+      where: { id: original.id },
+      data: {
+        upvotes: alreadyVerified ? undefined : { increment: 1 },
+        verifiedBy: req.userId && !alreadyVerified ? { push: req.userId } : undefined,
+      },
+    });
+
+    await prisma.issue.update({
+      where: { id: duplicate.id },
+      data: { status: 'Closed' },
+    });
+
+    await prisma.timeline.create({
+      data: {
+        issueId: duplicate.id,
+        event: 'Joined existing report',
+        actor: req.userName ?? 'Citizen',
+        actorRole: Object.values(Role).includes(req.userRole as Role) ? req.userRole as Role : 'Citizen',
+        note: `Linked to existing report ${original.id}`,
+      },
+    });
+
+    return res.json({ success: true, data: updatedOriginal });
+  } catch (e) {
+    const msg = (e instanceof Error) ? e.message : 'Failed to join duplicate report';
+    return res.status(500).json({ success: false, error: msg });
   }
 }
 
@@ -161,6 +204,18 @@ export async function createIssue(req: AuthRequest, res: Response) {
 export async function updateIssueStatus(req: AuthRequest, res: Response) {
   try {
     const { status, note } = req.body;
+
+    // Transitions that have dedicated routes must not come through here
+    const DEDICATED_ROUTE_STATUSES = ['Accepted', 'InProgress', 'Completed', 'NeedsVerification', 'Resolved'];
+    if (DEDICATED_ROUTE_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Use the dedicated /${status.toLowerCase()} endpoint for this transition`,
+      });
+    }
+
+    const actorName = req.userName ?? 'Authority';
+
     const issue = await prisma.issue.update({
       where: { id: req.params.id },
       data:  { status },
@@ -169,8 +224,11 @@ export async function updateIssueStatus(req: AuthRequest, res: Response) {
 
     await prisma.timeline.create({
       data: {
-        issueId: issue.id, event: `Status updated to ${status}`,
-        actor: 'Authority', actorRole: 'Authority', note,
+        issueId: issue.id,
+        event: `Status updated to ${status}`,
+        actor: actorName,
+        actorRole: 'Authority',
+        note,
       },
     });
 
@@ -181,10 +239,6 @@ export async function updateIssueStatus(req: AuthRequest, res: Response) {
         newStatus:     status,
         issueId:       issue.id,
       });
-    }
-
-    if (status === 'Resolved' && issue.reporterId) {
-      await awardXP(issue.reporterId, 50);
     }
 
     return res.json({ success: true, data: issue });

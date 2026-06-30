@@ -31,12 +31,16 @@ export const SEVERITY_LABELS = {
 } as const;
 
 export const STATUS_LABELS = {
-  Reported: 'Reported',
-  Verified: 'Verified',
-  Assigned: 'Assigned',
-  InProgress: 'In Progress',
-  Resolved: 'Resolved',
-  Closed: 'Closed',
+  Reported:          'Reported',
+  Verified:          'Verified',
+  Assigned:          'Assigned',
+  Accepted:          'Accepted',
+  InProgress:        'In Progress',
+  Completed:         'Completed',
+  NeedsVerification: 'Needs Verification',
+  Rejected:          'Rejected',
+  Resolved:          'Resolved',
+  Closed:            'Closed',
 } as const;
 
 export const CATEGORY_LABELS = {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Search, ArrowRight, Share2, CheckCircle } from 'lucide-react';
 import IssueDetail from '../components/issue/IssueDetail';
 import { fetchIssueById } from '../services/issueService';
@@ -13,7 +13,6 @@ const POLL_INTERVAL_MS = 30_000;
 
 export default function TrackPage() {
   const { id }     = useParams<{ id?: string }>();
-  const navigate   = useNavigate();
   const { addToast } = useUIStore();
 
   const [query,    setQuery]   = useState(id ?? '');

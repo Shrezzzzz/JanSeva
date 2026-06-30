@@ -1,12 +1,13 @@
 import type { AnalyticsSummary } from '../types/api.types';
 import type { Issue } from '../types/issue.types';
-import { subDays, format } from 'date-fns';
+import { subDays } from 'date-fns';
 
 function days(n: number): string { return subDays(new Date(), n).toISOString(); }
 function datePt(n: number, count: number) { return { date: subDays(new Date(), n).toISOString().split('T')[0], count }; }
 
 export const MOCK_ANALYTICS: AnalyticsSummary = {
   totalIssues:        12_430,
+  activeIssues:        4_220,
   resolvedIssues:     8_210,
   resolutionRate:     0.66,
   avgResolutionDays:  4.2,
@@ -25,7 +26,23 @@ export const MOCK_ANALYTICS: AnalyticsSummary = {
     { category: 'Park Issue',  count: 800,  resolved: 500,  color: '#16A34A' },
     { category: 'Other',       count: 930,  resolved: 610,  color: '#6F6F6F' },
   ],
+  severityDistribution: [
+    { severity: 'Low', count: 3200 },
+    { severity: 'Medium', count: 5100 },
+    { severity: 'High', count: 3100 },
+    { severity: 'Critical', count: 1030 },
+  ],
   byZone: [
+    { zone: 'Ward 1',  reported: 420, resolved: 380, avgDays: 3.2, responseRate: 0.90, grade: 'A' },
+    { zone: 'Ward 2',  reported: 310, resolved: 260, avgDays: 4.1, responseRate: 0.84, grade: 'B' },
+    { zone: 'Ward 3',  reported: 290, resolved: 230, avgDays: 5.0, responseRate: 0.79, grade: 'B' },
+    { zone: 'Ward 4',  reported: 380, resolved: 280, avgDays: 6.2, responseRate: 0.74, grade: 'C' },
+    { zone: 'Ward 5',  reported: 200, resolved: 120, avgDays: 9.0, responseRate: 0.60, grade: 'D' },
+    { zone: 'Ward 6',  reported: 340, resolved: 310, avgDays: 2.8, responseRate: 0.91, grade: 'A' },
+    { zone: 'Ward 7',  reported: 260, resolved: 240, avgDays: 3.5, responseRate: 0.92, grade: 'A' },
+    { zone: 'Ward 8',  reported: 410, resolved: 290, avgDays: 5.5, responseRate: 0.71, grade: 'C' },
+  ],
+  wardDistribution: [
     { zone: 'Ward 1',  reported: 420, resolved: 380, avgDays: 3.2, responseRate: 0.90, grade: 'A' },
     { zone: 'Ward 2',  reported: 310, resolved: 260, avgDays: 4.1, responseRate: 0.84, grade: 'B' },
     { zone: 'Ward 3',  reported: 290, resolved: 230, avgDays: 5.0, responseRate: 0.79, grade: 'B' },

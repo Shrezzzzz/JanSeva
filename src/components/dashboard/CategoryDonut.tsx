@@ -2,6 +2,14 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recha
 import type { CategoryStat } from '../../types/api.types';
 
 export default function CategoryDonut({ data }: { data: CategoryStat[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="h-[260px] flex items-center justify-center text-sm text-[#6F6F6F]">
+        No category data available for this range.
+      </div>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={260}>
       <PieChart>

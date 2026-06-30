@@ -1,11 +1,5 @@
 export type Role = 'Citizen' | 'Moderator' | 'Authority' | 'Admin';
 
-export interface Pet {
-  name:  string;
-  stage: number;
-  mood:  string;
-}
-
 export interface Badge {
   id: string;
   name: string;
@@ -31,7 +25,7 @@ export interface User {
   issuesVerified: number;
   commentsPosted: number;
   createdAt: string;
-  pet?: Pet;
+  activeCharacter?: string;
 }
 
 export interface AuthUser {
@@ -44,7 +38,7 @@ export interface AuthUser {
   avatarUrl?: string;
   xp: number;
   level: number;
-  pet?: Pet;
+  activeCharacter?: string;
 }
 
 export interface LeaderboardEntry {
@@ -58,6 +52,8 @@ export interface LeaderboardEntry {
   topBadge?: Badge;
   issuesReported: number;
   issuesResolved: number;
+  isAnonymous?: boolean;
+  activeCharacter?: string;
 }
 
 export interface XPEvent {

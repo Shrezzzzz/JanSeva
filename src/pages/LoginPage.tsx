@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useUIStore } from '../store/uiStore';
 import { isValidEmail } from '../utils/validators';
 import Button from '../components/ui/Button';
 import { ROUTES } from '../config/routes';
+import BrandLogo from '../components/brand/BrandLogo';
 
 type Mode = 'login' | 'register';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { isAuthenticated, signIn, signUp } = useAuth();
-  const { addToast } = useUIStore();
 
   const [mode,     setMode]     = useState<Mode>('login');
   const [name,     setName]     = useState('');
@@ -56,8 +55,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="font-display text-4xl text-[#0D0D0B]">
-            JanSeva<sup className="text-sm">®</sup>
+          <h1 className="text-4xl text-[#0D0D0B]">
+            <BrandLogo />
           </h1>
           <p className="text-sm text-[#6F6F6F] mt-2">
             {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
@@ -152,7 +151,7 @@ export default function LoginPage() {
         <p className="text-center text-xs text-[#6F6F6F] mt-6">
           <button
             type="button"
-            onClick={() => navigate(ROUTES.HOME)}
+            onClick={() => navigate(ROUTES.CITIZEN)}
             className="hover:text-[#0D0D0B] underline underline-offset-2"
           >
             Back to home

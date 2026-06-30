@@ -20,6 +20,15 @@ const TITLES = [
   'Fallen electricity pole on footpath',
 ];
 
+const AUTHORITY_ACCOUNTS = [
+  { name: 'JanSeva City Admin', email: 'admin@janseva.gov', password: 'Admin@123', role: 'Admin' as const, ward: 'All' },
+  { name: 'Road Maintenance Officer', email: 'roads@janseva.gov', password: 'Roads@123', role: 'Authority' as const, ward: 'All' },
+  { name: 'Water Department Officer', email: 'water@janseva.gov', password: 'Water@123', role: 'Authority' as const, ward: 'All' },
+  { name: 'Waste Management Officer', email: 'waste@janseva.gov', password: 'Waste@123', role: 'Authority' as const, ward: 'All' },
+  { name: 'Electricity Department Officer', email: 'electricity@janseva.gov', password: 'Electricity@123', role: 'Authority' as const, ward: 'All' },
+  { name: 'Ward Officer', email: 'officer@janseva.gov', password: 'Officer@123', role: 'Authority' as const, ward: 'Ward 1' },
+];
+
 function rand<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -28,47 +37,57 @@ function daysAgo(n: number): Date {
   return new Date(Date.now() - n * 86_400_000);
 }
 
+async function nextCitizenId() {
+  const count = await prisma.user.count();
+  return `JAN-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
+}
+
 export async function seed() {
   console.log('🌱 Seeding database…');
 
   // Create demo users
   const hash = await bcrypt.hash('Demo@1234', 10);
 
-  // Authority user
-  const authorityCount = await prisma.user.count();
-  const authority = await prisma.user.upsert({
-    where: { email: 'authority@janseva.in' },
-    update: {},
-    create: {
-      citizenId: `JAN-${new Date().getFullYear()}-${String(authorityCount + 1).padStart(5, '0')}`,
-      name: 'Kolkata Municipal Authority',
-      email: 'authority@janseva.in',
-      password: hash,
-      role: 'Authority',
-      ward: 'City-Wide',
-      xp: 0,
-    },
-  });
+  for (const account of AUTHORITY_ACCOUNTS) {
+    const hashedPassword = await bcrypt.hash(account.password, 10);
+    await prisma.user.upsert({
+      where: { email: account.email },
+      update: {
+        name: account.name,
+        password: hashedPassword,
+        role: account.role,
+        ward: account.ward,
+        xp: 0,
+      },
+      create: {
+        citizenId: await nextCitizenId(),
+        name: account.name,
+        email: account.email,
+        password: hashedPassword,
+        role: account.role,
+        ward: account.ward,
+        xp: 0,
+      },
+    });
+  }
 
-  const citizens = await Promise.all(
-    Array.from({ length: 10 }, async (_, i) => {
-      const countBefore = await prisma.user.count();
-      return prisma.user.upsert({
-        where: { email: `citizen${i + 1}@janseva.in` },
-        update: {},
-        create: {
-          citizenId: `JAN-${new Date().getFullYear()}-${String(countBefore + 1).padStart(5, '0')}`,
-          name: `Citizen ${i + 1}`,
-          email: `citizen${i + 1}@janseva.in`,
-          password: hash,
-          role: 'Citizen',
-          ward: `Ward ${(i % 8) + 1}`,
-          xp: (10 - i) * 40 + Math.floor(Math.random() * 20),
-          reportStreak: Math.floor(Math.random() * 7),
-        },
-      });
-    }),
-  );
+  const citizens = [];
+  for (let i = 0; i < 10; i += 1) {
+    citizens.push(await prisma.user.upsert({
+      where: { email: `citizen${i + 1}@janseva.in` },
+      update: {},
+      create: {
+        citizenId: await nextCitizenId(),
+        name: `Citizen ${i + 1}`,
+        email: `citizen${i + 1}@janseva.in`,
+        password: hash,
+        role: 'Citizen',
+        ward: `Ward ${(i % 8) + 1}`,
+        xp: (10 - i) * 40 + Math.floor(Math.random() * 20),
+        reportStreak: Math.floor(Math.random() * 7),
+      },
+    }));
+  }
 
   // Create 50 demo issues
   for (let i = 0; i < 50; i++) {
@@ -79,6 +98,14 @@ export async function seed() {
     const title     = TITLES[i % TITLES.length];
     const daysBack  = Math.floor(Math.random() * 60);
     const createdAt = daysAgo(daysBack);
+
+    // Resolved/Closed issues should show a realistic resolution time —
+    // pick an updatedAt that's 1-7 days after createdAt (but not later than now).
+    const isDone = status === 'Resolved' || status === 'Closed';
+    const resolutionDelayDays = isDone ? Math.floor(Math.random() * 7) + 1 : 0;
+    const updatedAt = isDone
+      ? new Date(Math.min(createdAt.getTime() + resolutionDelayDays * 86400000, Date.now()))
+      : createdAt;
 
     const issue = await prisma.issue.create({
       data: {
@@ -96,7 +123,7 @@ export async function seed() {
         reporterId: reporter.id,
         upvotes: Math.floor(Math.random() * 15),
         createdAt,
-        updatedAt: createdAt,
+        updatedAt,
       },
     });
 
@@ -127,7 +154,7 @@ export async function seed() {
     }
   }
 
-  console.log('✅ Seed complete — 50 issues, 10 citizens, 1 authority');
+  console.log('✅ Seed complete — 50 issues, 10 citizens, authority/admin accounts refreshed');
   await prisma.$disconnect();
 }
 

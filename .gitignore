@@ -33,7 +33,6 @@ Thumbs.db
 *.tsbuildinfo
 
 # ── Prisma ────────────────────────────────────────
-backend/prisma/migrations/
 
 # ── PWA ───────────────────────────────────────────
 sw.js

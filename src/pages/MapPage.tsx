@@ -201,9 +201,9 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Issue detail side panel */}
+        {/* Issue detail side panel / bottom sheet */}
         {selected && (
-          <div className="absolute top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white z-[550] shadow-2xl overflow-hidden flex flex-col animate-slide-right">
+          <div className="absolute inset-x-0 bottom-0 top-16 sm:top-0 sm:inset-y-0 sm:left-auto sm:right-0 w-full sm:w-[420px] bg-white z-[550] shadow-2xl overflow-hidden flex flex-col animate-slide-up sm:animate-slide-right rounded-t-3xl sm:rounded-none transition-transform">
             <IssueDetail issue={selected} onClose={() => setSelected(null)} />
           </div>
         )}

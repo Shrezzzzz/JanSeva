@@ -41,8 +41,6 @@ export function RegisterModal({ open, onClose }: RegisterModalProps) {
   const [detecting, setDetecting] = useState(false);
   const [wardError, setWardError] = useState('');
 
-  const passwordRulesMet = PASSWORD_RULES.every((r) => r.met(password));
-
   // ── Ward auto-detect via Nominatim ───────────────────────────────────────
   async function detectWard() {
     if (!navigator.geolocation) {

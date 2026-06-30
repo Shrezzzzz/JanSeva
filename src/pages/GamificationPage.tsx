@@ -12,17 +12,6 @@ import Button from '../components/ui/Button';
 import { useUIStore } from '../store/uiStore';
 import api from '../services/api';
 
-const MOCK_ENTRIES: LeaderboardEntry[] = Array.from({ length: 10 }, (_, i) => ({
-  rank:           i + 1,
-  userId:         `user-${i + 1}`,
-  name:           ['Priya Sharma','Arjun Bose','Kavitha Rao','Siddharth M','Meera Pillai','Rahul Das','Anjali K','Vikram S','Sunita P','Dev Gupta'][i],
-  ward:           `Ward ${(i % 8) + 1}`,
-  xp:             (10 - i) * 420,
-  topBadge:       AVAILABLE_BADGES[i % AVAILABLE_BADGES.length],
-  issuesReported: (10 - i) * 8,
-  issuesResolved: (10 - i) * 5,
-}));
-
 type Period = 'all' | 'month' | 'ward';
 
 export default function GamificationPage() {
@@ -37,39 +26,49 @@ export default function GamificationPage() {
 
   // Fetch leaderboard — pass ward when "My Ward" is selected
   useEffect(() => {
-    setLbLoading(true);
-    const ward = period === 'ward' ? (authUser?.ward ?? undefined) : undefined;
-    fetchLeaderboard(period, ward)
-      .then((data) => setEntries(Array.isArray(data) && data.length ? data : MOCK_ENTRIES))
-      .catch(() => setEntries(MOCK_ENTRIES))
-      .finally(() => setLbLoading(false));
+    async function loadLeaderboard() {
+      setLbLoading(true);
+      const ward = period === 'ward' ? (authUser?.ward ?? undefined) : undefined;
+      try {
+        const data = await fetchLeaderboard(period, ward);
+        setEntries(Array.isArray(data) ? data : []);
+      } catch {
+        setEntries([]);
+      } finally {
+        setLbLoading(false);
+      }
+    }
+
+    void loadLeaderboard();
   }, [period, authUser?.ward]);
 
   // Fetch the logged-in user's real stats from API
   useEffect(() => {
-    if (!authUser?.id) { setDisplayUser(null); return; }
+    async function loadUserStats() {
+      if (!authUser?.id) {
+        setDisplayUser(null);
+        return;
+      }
 
-    setUserLoading(true);
-    Promise.all([
-      api.get(`/users/${authUser.id}`),
-      api.get(`/issues?page=1&pageSize=100`),
-    ])
-      .then(([userRes, issueRes]) => {
+      setUserLoading(true);
+      try {
+        const [userRes, issueRes] = await Promise.all([
+          api.get(`/users/${authUser.id}`),
+          api.get(`/issues?page=1&pageSize=100`),
+        ]);
         const u      = userRes.data.data;
         const issues = Array.isArray(issueRes.data.data) ? issueRes.data.data : [];
-        const resolvedCount = issues.filter(
-          (i: { status: string }) => i.status === 'Resolved' || i.status === 'Closed',
-        ).length;
 
         setDisplayUser({
-          id:             authUser.id,
+          id:             u.id,
           citizenId:      u.citizenId,
-          name:           authUser.name,
+          name:           u.name?.trim() || 'Anonymous Citizen',
           email:          authUser.email,
           role:           u.role ?? authUser.role ?? 'Citizen',
           ward:           u.ward ?? authUser.ward ?? '',
-          xp:             authUser.xp ?? u.xp ?? 0,
-          level:          authUser.level ?? u.level ?? 1,
+          avatarUrl:      u.avatarUrl ?? authUser.avatarUrl,
+          xp:             u.xp ?? 0,
+          level:          u.level ?? 1,
           badges:         AVAILABLE_BADGES.map((b, i) => ({
             ...b,
             locked:   i >= (u.badges?.length ?? 0),
@@ -80,9 +79,9 @@ export default function GamificationPage() {
           issuesVerified: 0,
           commentsPosted: 0,
           createdAt:      u.createdAt,
+          activeCharacter: u.activeCharacter ?? authUser.activeCharacter,
         });
-      })
-      .catch(() => {
+      } catch {
         // Fall back to auth store data with zeroed activity stats
         setDisplayUser({
           id:             authUser.id,
@@ -102,17 +101,31 @@ export default function GamificationPage() {
           issuesVerified: 0,
           commentsPosted: 0,
           createdAt:      new Date(Date.now() - 30 * 86400000).toISOString(),
+          activeCharacter: authUser.activeCharacter,
         });
-      })
-      .finally(() => setUserLoading(false));
-  }, [authUser?.id]);
+      } finally {
+        setUserLoading(false);
+      }
+    }
+
+    void loadUserStats();
+  }, [
+    authUser?.activeCharacter,
+    authUser?.email,
+    authUser?.id,
+    authUser?.level,
+    authUser?.name,
+    authUser?.role,
+    authUser?.ward,
+    authUser?.xp,
+  ]);
 
   return (
-    <div className="min-h-screen pt-24 pb-16">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-10">
+    <div className="min-h-screen pt-20 sm:pt-24 pb-24 sm:pb-16">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-8 sm:space-y-10">
         <div>
-          <h1 className="font-display text-5xl text-[#0D0D0B]">Leaderboard</h1>
-          <p className="text-[#6F6F6F] mt-2">Top civic contributors this period.</p>
+          <h1 className="font-display text-3xl sm:text-5xl text-[#0D0D0B]">Leaderboard</h1>
+          <p className="text-[#6F6F6F] mt-1 sm:mt-2 text-sm sm:text-base">Top civic contributors this period.</p>
         </div>
 
         {/* My profile card */}
@@ -125,28 +138,28 @@ export default function GamificationPage() {
             <>
               <CitizenProfile user={displayUser} />
               <div>
-                <h2 className="font-display text-2xl text-[#0D0D0B] mb-4">My Badges</h2>
+                <h2 className="font-display text-xl sm:text-2xl text-[#0D0D0B] mb-3 sm:mb-4">My Badges</h2>
                 <BadgeGrid badges={displayUser.badges} />
               </div>
             </>
           ) : null
         ) : (
           <div className="bg-white rounded-2xl border border-[#E5E5E0] p-6 text-center">
-            <p className="text-[#6F6F6F] mb-3">Sign in to see your profile and earn badges.</p>
+            <p className="text-[#6F6F6F] mb-3 text-sm">Sign in to see your profile and earn badges.</p>
             <Button onClick={openLogin}>Sign In</Button>
           </div>
         )}
 
         {/* City leaderboard */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-2xl text-[#0D0D0B]">City Leaderboard</h2>
-            <div className="flex gap-2">
+          <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-3">
+            <h2 className="font-display text-xl sm:text-2xl text-[#0D0D0B]">City Leaderboard</h2>
+            <div className="flex gap-1.5 sm:gap-2">
               {(['all', 'month', 'ward'] as Period[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize border transition-colors ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium capitalize border transition-colors min-h-[36px] ${
                     period === p
                       ? 'bg-[#0D0D0B] text-white border-[#0D0D0B]'
                       : 'border-[#E5E5E0] text-[#6F6F6F] hover:border-[#0D0D0B]'
@@ -167,8 +180,8 @@ export default function GamificationPage() {
         </div>
 
         {/* XP activity feed */}
-        <div>
-          <h2 className="font-display text-2xl text-[#0D0D0B] mb-4">Recent XP</h2>
+        <div className="pb-4">
+          <h2 className="font-display text-xl sm:text-2xl text-[#0D0D0B] mb-3 sm:mb-4">Recent XP</h2>
           <div className="space-y-2">
             {[
               { icon: '✅', text: 'Issue resolved — community thanks you!', xp: 50 },
@@ -176,10 +189,10 @@ export default function GamificationPage() {
               { icon: '✓',  text: 'You verified an issue',                  xp: 5  },
               { icon: '💬', text: 'You posted a helpful comment',           xp: 5  },
             ].map((ev, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[#F7F7F5]">
+              <div key={i} className="flex items-center gap-3 p-3 sm:p-3 rounded-xl bg-[#F7F7F5]">
                 <span className="text-lg">{ev.icon}</span>
                 <span className="flex-1 text-sm text-[#0D0D0B]">{ev.text}</span>
-                <span className="text-sm font-semibold text-[#1A6B3C]">+{ev.xp} XP</span>
+                <span className="text-sm font-semibold text-[#1A6B3C] shrink-0">+{ev.xp} XP</span>
               </div>
             ))}
           </div>

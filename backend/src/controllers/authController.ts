@@ -4,13 +4,13 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { isValidEmail } from '../utils/validators';
 import type { AuthRequest } from '../middleware/auth';
+import { getJwtSecret } from '../utils/jwt';
 
 const prisma = new PrismaClient();
-const JWT_SECRET  = process.env.JWT_SECRET  ?? 'dev_secret';
 const JWT_EXPIRES = process.env.JWT_EXPIRES_IN ?? '7d';
 
 function makeToken(userId: string, role: string) {
-  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES } as jwt.SignOptions);
+  return jwt.sign({ userId, role }, getJwtSecret(), { expiresIn: JWT_EXPIRES } as jwt.SignOptions);
 }
 
 export async function register(req: Request, res: Response) {
@@ -49,10 +49,10 @@ export async function register(req: Request, res: Response) {
       success: true,
       data: {
         token,
-        user: { id: user.id, citizenId: user.citizenId, name: user.name, email: user.email, role: user.role, ward: user.ward, xp: user.xp, level: user.level },
+        user: { id: user.id, citizenId: user.citizenId, name: user.name, email: user.email, role: user.role, ward: user.ward, xp: user.xp, level: user.level, activeCharacter: user.activeCharacter },
       },
     });
-  } catch (e) {
+  } catch {
     const msg = 'Registration failed. Please try again.';
     return res.status(500).json({ success: false, error: msg, message: msg });
   }
@@ -61,34 +61,28 @@ export async function register(req: Request, res: Response) {
 export async function login(req: Request, res: Response) {
   try {
     const { email, password } = req.body;
+    const invalidLoginMessage = 'Invalid email or password.';
     if (!email || !password)
-      return res.status(400).json({ success: false, error: 'email and password are required' });
+      return res.status(400).json({ success: false, error: 'Email and password are required.' });
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user)
-      return res.status(401).json({ success: false, error: 'Invalid credentials' });
+      return res.status(401).json({ success: false, error: invalidLoginMessage });
 
     const ok = await bcrypt.compare(password, user.password);
     if (!ok)
-      return res.status(401).json({ success: false, error: 'Invalid credentials' });
-
-    // Auto-create pet on first login
-    await prisma.pet.upsert({
-      where:  { userId: user.id },
-      update: {},
-      create: { id: `pet_${user.id}`, userId: user.id, name: 'Nagar', stage: 0, mood: 'happy' },
-    });
+      return res.status(401).json({ success: false, error: invalidLoginMessage });
 
     const token = makeToken(user.id, user.role);
     return res.json({
       success: true,
       data: {
         token,
-        user: { id: user.id, citizenId: user.citizenId, name: user.name, email: user.email, role: user.role, ward: user.ward, xp: user.xp, level: user.level },
+        user: { id: user.id, citizenId: user.citizenId, name: user.name, email: user.email, role: user.role, ward: user.ward, xp: user.xp, level: user.level, activeCharacter: user.activeCharacter },
       },
     });
   } catch {
-    return res.status(500).json({ success: false, error: 'Login failed' });
+    return res.status(500).json({ success: false, error: 'Something went wrong. Please try again.' });
   }
 }
 
@@ -97,9 +91,9 @@ export async function getMe(req: AuthRequest, res: Response) {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
       select: {
-        id: true, citizenId: true, name: true, email: true, role: true, ward: true,
+        id: true, citizenId: true, name: true, email: true, role: true, ward: true, avatarUrl: true,
         xp: true, level: true, badges: true, reportStreak: true, createdAt: true,
-        pet: { select: { name: true, stage: true, mood: true } },
+        activeCharacter: true,
         _count: { select: { issues: true, comments: true } },
       },
     });

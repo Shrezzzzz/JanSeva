@@ -14,7 +14,11 @@ export type IssueStatus =
   | 'Reported'
   | 'Verified'
   | 'Assigned'
+  | 'Accepted'
   | 'InProgress'
+  | 'Completed'
+  | 'NeedsVerification'
+  | 'Rejected'
   | 'Resolved'
   | 'Closed';
 
@@ -64,11 +68,50 @@ export interface Issue {
   upvotes: number;
   verifiedBy: string[];
   duplicateOf?: string;
+  duplicateConfidence?: number;
   aiCategory?: string;
   aiConfidence?: number;
   aiSeverity?: string;
   estimatedResolutionDays?: number;
+  resolutionConfidence?: number;
+  resolutionReason?: string;
   department?: string;
+  departmentConfidence?: number;
+  departmentReason?: string;
+  priorityScore?: number;
+  priorityLabel?: string;
+  priorityReason?: string;
+  citizenGuidance?: {
+    issueSummary?: string;
+    personalizedAdvice?: string;
+    safetyRecommendations?: string[];
+    verificationSuggestions?: string[];
+    progressExpectations?: string;
+    confidence?: number;
+    reason?: string;
+    timestamp?: string;
+    modelUsed?: string;
+  };
+  authoritySummary?: string;
+  aiNotifications?: unknown;
+  workflowRecommendation?: {
+    nextBestAction?: string;
+    recommendedOwner?: string;
+    escalationRequired?: boolean;
+    suggestedWorkOrder?: string[];
+    confidence?: number;
+    reason?: string;
+    timestamp?: string;
+    modelUsed?: string;
+  };
+  communityInsight?: unknown;
+  heatmapInsight?: unknown;
+  aiModelUsed?: string;
+  aiAnalyzedAt?: string;
+  aiFailureReason?: string;
+  assignedTo?: string;
+  completionNotes?: string;
+  completionPhotos?: string[];
   comments?: Comment[];
   timeline?: TimelineEvent[];
   createdAt: string;
@@ -122,10 +165,14 @@ export const CATEGORY_ICONS: Record<Category, string> = {
 };
 
 export const STATUS_COLORS: Record<IssueStatus, string> = {
-  Reported: '#9CA3AF',
-  Verified: '#0284C7',
-  Assigned: '#D97706',
-  InProgress: '#F59E0B',
-  Resolved: '#1A6B3C',
-  Closed: '#6B7280',
+  Reported:          '#9CA3AF',
+  Verified:          '#0284C7',
+  Assigned:          '#D97706',
+  Accepted:          '#7C3AED',
+  InProgress:        '#F59E0B',
+  Completed:         '#0891B2',
+  NeedsVerification: '#EA580C',
+  Rejected:          '#DC2626',
+  Resolved:          '#1A6B3C',
+  Closed:            '#6B7280',
 };

@@ -1,21 +1,261 @@
+import { nowIso } from "../ai/utils/json";
 import type { Request, Response } from 'express';
-import { categorizeIssue, generateInsights, analyzeSentiment } from '../services/groqService';
+import { PrismaClient } from '@prisma/client';
+import { categorizeIssue, categorizeIssueFromImage, generateInsights, analyzeSentiment } from '../services/groqService';
+import type { AuthorityBrief } from '../ai/types';
+import { generateGeminiJSON, getGeminiModel } from '../ai/gemini/client';
+import { getAuthorityWhereClause } from '../services/authorityAssignmentService';
+import type { AuthRequest } from '../middleware/auth';
+
+const prisma = new PrismaClient();
+const AUTHORITY_BRIEF_CACHE_MS = 5 * 60 * 1000;
+const authorityBriefCache = new Map<string, { expiresAt: number; data: AuthorityBrief }>();
 
 export async function categorize(req: Request, res: Response) {
   try {
-    const { description } = req.body;
-    if (!description) return res.status(400).json({ success: false, error: 'description required' });
-    const result = await categorizeIssue(description);
+    const { description, imageBase64, mimeType } = req.body;
+    if (!description && !imageBase64) return res.status(400).json({ success: false, error: 'description or imageBase64 required' });
+
+    const fallback = imageBase64
+      ? await categorizeIssueFromImage(imageBase64, mimeType).catch(() => null)
+      : await categorizeIssue(description).catch(() => null);
+
+    const result = await generateGeminiJSON(
+      `
+You are JanSeva Gemini Civic Intelligence.
+Categorize this civic report and return ONLY JSON:
+{
+  "category": one of [Pothole, Streetlight, WaterLeak, WasteDump, Sewage, RoadDamage, ParkIssue, Other],
+  "severity": one of [Low, Medium, High, Critical],
+  "confidence": number between 0 and 1,
+  "title": a short 5-8 word issue title,
+  "estimatedResolutionDays": number,
+  "department": the responsible municipal department
+}
+Report text: ${description || 'Image evidence was uploaded; infer conservatively from any provided context.'}
+Existing fallback signal: ${JSON.stringify(fallback)}
+`.trim(),
+      fallback,
+    );
     return res.json({ success: true, data: result });
   } catch {
     return res.status(500).json({ success: false, error: 'AI categorization failed' });
   }
 }
 
+export async function authorityBrief(req: Request, res: Response) {
+  try {
+    const authReq = req as AuthRequest;
+    const user = authReq.userId
+      ? await prisma.user.findUnique({
+          where: { id: authReq.userId },
+          select: { id: true, email: true, role: true, ward: true },
+        })
+      : null;
+
+    const ward = typeof req.query.ward === 'string' && req.query.ward !== 'All' ? req.query.ward : undefined;
+    const cacheKey = user ? `user-${user.id}-${ward || 'city-wide'}` : (ward || 'city-wide');
+    const cached = authorityBriefCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json({ success: true, data: cached.data });
+    }
+
+    const authorityWhere = user ? getAuthorityWhereClause(user) : {};
+    if (ward && ward !== 'City-Wide') {
+      authorityWhere.AND = [
+        ...(Array.isArray(authorityWhere.AND) ? authorityWhere.AND : authorityWhere.AND ? [authorityWhere.AND] : []),
+        { zone: { contains: ward } }
+      ];
+    }
+
+    const issues = await prisma.issue.findMany({
+      where: authorityWhere,
+      orderBy: [{ priorityScore: 'desc' }, { createdAt: 'desc' }],
+      take: 80,
+      select: {
+        id: true,
+        title: true,
+        severity: true,
+        status: true,
+        zone: true,
+        address: true,
+        duplicateOf: true,
+        department: true,
+        priorityScore: true,
+        workflowRecommendation: true,
+        createdAt: true,
+      },
+    });
+
+    const critical = issues.filter((issue) => issue.severity === 'Critical' || (issue.priorityScore ?? 0) >= 85);
+    const duplicateClusters = issues
+      .filter((issue) => issue.duplicateOf)
+      .slice(0, 5)
+      .map((issue) => `${issue.title} -> ${issue.duplicateOf}`);
+    const departments = issues.reduce<Record<string, number>>((acc, issue) => {
+      const key = issue.department || 'Unassigned';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+    const zones = issues.reduce<Record<string, number>>((acc, issue) => {
+      const key = issue.zone || 'Unassigned Zone';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const departmentsUnderPressure = Object.entries(departments)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([name, count]) => `${name} (${count})`);
+    const highestPriorityAreas = Object.entries(zones)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([name, count]) => `${name} (${count})`);
+    const workOrder = issues
+      .slice(0, 6)
+      .map((issue) => `${issue.priorityScore ?? 0}: ${issue.workflowRecommendation && typeof issue.workflowRecommendation === 'object' && 'nextBestAction' in issue.workflowRecommendation ? String(issue.workflowRecommendation.nextBestAction) : issue.title}`);
+
+    const fallbackBrief: AuthorityBrief = {
+      summary: critical.length
+        ? `${critical.length} urgent civic cases need attention. Highest load is in ${highestPriorityAreas[0] || 'current wards'}, with ${departmentsUnderPressure[0] || 'municipal operations'} carrying the largest queue.`
+        : `No critical spike detected. ${issues.length} active cases are available for review, led by ${highestPriorityAreas[0] || 'routine ward operations'}.`,
+      criticalIssues: critical.slice(0, 5).map((issue) => `${issue.title} (${issue.priorityScore ?? 'unscored'})`),
+      duplicateClusters,
+      recommendedActions: [
+        critical.length ? 'Inspect critical cases within 24 hours' : 'Continue ward verification and assignment',
+        duplicateClusters.length ? 'Merge duplicate clusters before dispatch' : 'Monitor for duplicate reports',
+        'Assign highest priority cases before routine queue',
+      ],
+      highestPriorityAreas,
+      departmentsUnderPressure,
+      urgentEscalations: critical.slice(0, 4).map((issue) => issue.title),
+      suggestedWorkOrder: workOrder,
+      confidence: 0.74,
+      reason: 'Brief is generated from persisted AI priority, duplicate, department, zone, and workflow metadata.',
+      timestamp: nowIso(),
+      modelUsed: 'janseva-authority-brief-engine',
+    };
+
+    const promptIssues = issues.map((issue) => ({
+      title: issue.title,
+      severity: issue.severity,
+      status: issue.status,
+      zone: issue.zone,
+      department: issue.department,
+      priorityScore: issue.priorityScore,
+      duplicateOf: issue.duplicateOf,
+      nextBestAction: issue.workflowRecommendation && typeof issue.workflowRecommendation === 'object' && 'nextBestAction' in issue.workflowRecommendation
+        ? String(issue.workflowRecommendation.nextBestAction)
+        : undefined,
+    }));
+
+    const brief = await generateGeminiJSON<AuthorityBrief>(
+      `
+You are JanSeva Gemini Civic Intelligence for a municipal authority dashboard.
+Return ONLY JSON matching this shape:
+${JSON.stringify(fallbackBrief, null, 2)}
+
+Improve the brief using the issue data. Keep summary concise and operational.
+Issues:
+${JSON.stringify(promptIssues)}
+`.trim(),
+      fallbackBrief,
+      { timeoutMs: 8_000 },
+    );
+    brief.modelUsed = brief.modelUsed || getGeminiModel();
+    authorityBriefCache.set(cacheKey, {
+      expiresAt: Date.now() + AUTHORITY_BRIEF_CACHE_MS,
+      data: brief,
+    });
+
+    return res.json({ success: true, data: brief });
+  } catch (error) {
+    console.error('Authority brief failed:', error);
+    return res.status(500).json({ success: false, error: 'Failed to generate authority brief' });
+  }
+}
+
+export async function communityInsights(_req: Request, res: Response) {
+  try {
+    const issues = await prisma.issue.findMany({ orderBy: { createdAt: 'desc' }, take: 200 });
+    const byCategory = issues.reduce<Record<string, number>>((acc, issue) => {
+      acc[issue.category] = (acc[issue.category] ?? 0) + 1;
+      return acc;
+    }, {});
+    const topWard = issues.reduce<Record<string, number>>((acc, issue) => {
+      const key = issue.zone || 'Unassigned Zone';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const data = {
+      trends: Object.entries(byCategory)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([category, count]) => ({
+          title: `${category} ${count >= 5 ? '+' : ''}${Math.min(count * 3, 24)}%`,
+          description: `${count} recent ${category} report${count === 1 ? '' : 's'} in the operating window.`,
+          priority: count >= 6 ? 'High' : count >= 3 ? 'Medium' : 'Low',
+        })),
+      topAffectedWard: Object.entries(topWard).sort((a, b) => b[1] - a[1])[0]?.[0] || 'No ward data',
+      fastestRespondingDepartment: issues.find((issue) => issue.status === 'Resolved' && issue.department)?.department || 'Road Maintenance Department',
+      generatedAt: nowIso(),
+      modelUsed: 'janseva-community-insight-engine',
+    };
+
+    return res.json({ success: true, data });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to generate community insights' });
+  }
+}
+
+export async function heatmapInsights(req: Request, res: Response) {
+  try {
+    const zone = typeof req.query.zone === 'string' ? req.query.zone : undefined;
+    const issues = await prisma.issue.findMany({
+      where: zone ? { zone: { contains: zone } } : {},
+      orderBy: [{ priorityScore: 'desc' }, { createdAt: 'desc' }],
+      take: 80,
+    });
+
+    const persisted = issues
+      .map((issue) => issue.heatmapInsight)
+      .filter(Boolean)
+      .slice(0, 5);
+
+    const data = {
+      insights: persisted,
+      hotspots: Array.from(new Set(issues.map((issue) => issue.zone).filter(Boolean))).slice(0, 6),
+      emergingRiskZones: issues.filter((issue) => (issue.priorityScore ?? 0) >= 70).map((issue) => issue.zone || issue.address || issue.title).slice(0, 6),
+      repeatedIssueAreas: issues.filter((issue) => issue.duplicateOf).map((issue) => issue.address || issue.zone || issue.title).slice(0, 6),
+      generatedAt: nowIso(),
+      modelUsed: 'janseva-heatmap-insight-engine',
+    };
+
+    return res.json({ success: true, data });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to generate heatmap insights' });
+  }
+}
+
 export async function getInsights(req: Request, res: Response) {
   try {
     const { statsJson } = req.body;
-    const insights = await generateInsights(statsJson ?? '{}');
+    const fallback = process.env.GROQ_API_KEY
+      ? await generateInsights(statsJson ?? '{}').catch(() => [])
+      : [];
+    const result = await generateGeminiJSON(
+      `
+You are JanSeva Gemini Civic Intelligence.
+Given city issue statistics, return ONLY JSON:
+{ "insights": [{ "title": string, "description": string, "icon": string, "priority": "High"|"Medium"|"Low" }] }
+Create useful civic insights about categories, hotspots, trends, department performance, predicted clusters, resolution performance, and citizen participation.
+Stats: ${statsJson ?? '{}'}
+Fallback: ${JSON.stringify(fallback)}
+`.trim(),
+      { insights: fallback },
+    );
+    const insights = result.insights;
     return res.json({ success: true, data: { insights } });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to generate insights' });

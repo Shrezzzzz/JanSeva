@@ -15,6 +15,14 @@ export default function TrendChart({ reported, resolved }: TrendChartProps) {
     resolved: resolved[i]?.count ?? 0,
   }));
 
+  if (data.length === 0) {
+    return (
+      <div className="h-[260px] flex items-center justify-center text-sm text-[#6F6F6F]">
+        No issue trend data available for this range.
+      </div>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>

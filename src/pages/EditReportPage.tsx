@@ -215,21 +215,20 @@ export default function EditReportPage() {
             </div>
           )}
 
-          {/* Actions */}
           {!isLocked && (
-            <div className="flex items-center justify-between pt-2 border-t border-[#E5E5E0]">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 border-t border-[#E5E5E0]">
               {/* Delete */}
-              <div>
+              <div className="flex justify-center sm:justify-start">
                 {!confirmDel ? (
                   <button
                     type="button"
                     onClick={() => setConfirmDel(true)}
-                    className="flex items-center gap-2 text-sm text-[#DC2626] hover:text-red-700 transition-colors"
+                    className="flex items-center gap-2 text-sm text-[#DC2626] hover:text-red-700 transition-colors py-2"
                   >
                     <Trash2 size={15} /> Delete report
                   </button>
                 ) : (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 py-2">
                     <AlertTriangle size={15} className="text-[#DC2626]" />
                     <span className="text-sm text-[#DC2626]">Are you sure?</span>
                     <button
@@ -243,7 +242,7 @@ export default function EditReportPage() {
                     <button
                       type="button"
                       onClick={() => setConfirmDel(false)}
-                      className="text-sm text-[#6F6F6F] hover:text-[#0D0D0B]"
+                      className="text-sm text-[#6F6F6F] hover:text-[#0D0D0B] ml-1"
                     >
                       Cancel
                     </button>
@@ -252,7 +251,7 @@ export default function EditReportPage() {
               </div>
 
               {/* Save */}
-              <Button onClick={handleSave} loading={saving} icon={<Save size={15} />}>
+              <Button onClick={handleSave} loading={saving} icon={<Save size={15} />} className="w-full sm:w-auto justify-center">
                 Save changes
               </Button>
             </div>

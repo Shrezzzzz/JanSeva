@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { getSummary, getAIInsights, getLeaderboard } from '../controllers/analyticsController';
+import { authMiddleware, optionalAuth } from '../middleware/auth';
 
 const router = Router();
 
-router.get('/summary',     getSummary);
-router.get('/insights',    getAIInsights);
-router.get('/leaderboard', getLeaderboard);
+router.get('/summary',     optionalAuth,   getSummary);
+router.get('/insights',    authMiddleware, getAIInsights);
+router.get('/leaderboard', optionalAuth,   getLeaderboard);
 
 export default router;

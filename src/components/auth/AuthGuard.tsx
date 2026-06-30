@@ -11,7 +11,7 @@ interface AuthGuardProps {
   redirectTo?: string;
 }
 
-export default function AuthGuard({ children, role, redirectTo = '/' }: AuthGuardProps) {
+export default function AuthGuard({ children, role, redirectTo = '/citizen' }: AuthGuardProps) {
   const { user }         = useAuthStore();
   const { openLogin }    = useUIStore();
   const navigate         = useNavigate();

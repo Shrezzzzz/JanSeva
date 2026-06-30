@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
-import { CheckCircle, Share2, ArrowRight, ArrowLeft, Twitter, User } from 'lucide-react';
+import { CheckCircle, Share2, ArrowRight, ArrowLeft, Twitter, User, Sparkles } from 'lucide-react';
 import MediaUpload, { type FilePreview } from './MediaUpload';
 import AICategorizer from './AICategorizer';
 import LocationPicker from './LocationPicker';
@@ -9,11 +9,11 @@ import VoiceInput from './VoiceInput';
 import Button from '../ui/Button';
 import { useGroqAI } from '../../hooks/useGroqAI';
 import { uploadFiles } from '../../services/uploadService';
-import { createIssue } from '../../services/issueService';
+import { createIssue, fetchIssueById, joinDuplicateIssue } from '../../services/issueService';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { ROUTES } from '../../config/routes';
-import type { Category, Severity } from '../../types/issue.types';
+import type { Category, Issue, Severity } from '../../types/issue.types';
 import { issueIdDisplay } from '../../utils/formatters';
 
 type Step = 1 | 2 | 3 | 'success';
@@ -24,7 +24,7 @@ export default function ReportForm() {
   const navigate = useNavigate();
   const { addToast } = useUIStore();
   const { isAuthenticated } = useAuthStore();
-  const { result: aiResult, loading: aiLoading, analyzeImage, analyzeText } = useGroqAI();
+  const { result: aiResult, loading: aiLoading, analyzeImage } = useGroqAI();
 
   const [step,        setStep]        = useState<Step>(1);
   const [previews,    setPreviews]    = useState<FilePreview[]>([]);
@@ -39,6 +39,8 @@ export default function ReportForm() {
   const [overrideMode, setOverrideMode] = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [issueId,     setIssueId]     = useState('');
+  const [submittedIssue, setSubmittedIssue] = useState<Issue | null>(null);
+  const [joiningDuplicate, setJoiningDuplicate] = useState(false);
 
   const handleFirstImage = useCallback(async (file: File) => {
     await analyzeImage(file);
@@ -104,10 +106,9 @@ export default function ReportForm() {
         department:   aiResult?.department,
       };
 
-      console.log('SUBMIT PAYLOAD:', payload);
-
       const issue = await createIssue(payload);
       setIssueId(issue.id);
+      setSubmittedIssue(issue);
       confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
       setStep('success');
     } catch (e) {
@@ -122,6 +123,44 @@ export default function ReportForm() {
       addToast({ type: 'error', title: 'Submission failed', message: msg });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (step !== 'success' || !issueId) return;
+    let attempts = 0;
+    const interval = window.setInterval(async () => {
+      attempts += 1;
+      try {
+        const fresh = await fetchIssueById(issueId);
+        setSubmittedIssue(fresh);
+        if (fresh.aiAnalyzedAt || attempts >= 8) window.clearInterval(interval);
+      } catch {
+        if (attempts >= 8) window.clearInterval(interval);
+      }
+    }, 2500);
+    return () => window.clearInterval(interval);
+  }, [issueId, step]);
+
+  async function handleJoinDuplicate() {
+    if (!issueId) return;
+    setJoiningDuplicate(true);
+    try {
+      const original = await joinDuplicateIssue(issueId);
+      addToast({
+        type: 'success',
+        title: 'Joined existing report',
+        message: 'Your verification was added to the original issue.',
+      });
+      navigate(`${ROUTES.TRACK}/${original.id}`);
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Could not join report',
+        message: (e as Error).message || 'Please track your new report instead.',
+      });
+    } finally {
+      setJoiningDuplicate(false);
     }
   }
 
@@ -142,8 +181,49 @@ export default function ReportForm() {
           {issueIdDisplay(issueId)}
         </div>
         <p className="text-xs text-[#6F6F6F] mt-2">
-          Estimated resolution: <strong>{aiResult?.estimatedResolutionDays ?? 5} days</strong>
+          Estimated resolution: <strong>{submittedIssue?.estimatedResolutionDays ?? aiResult?.estimatedResolutionDays ?? 5} days</strong>
         </p>
+
+        <div className="mt-5 w-full text-left rounded-2xl border border-[#E5E5E0] bg-white p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-[#1A6B3C]" />
+              <span className="text-sm font-semibold text-[#0D0D0B]">AI Civic Brief</span>
+            </div>
+            {submittedIssue?.priorityScore ? (
+              <span className="text-xs font-bold text-[#1A6B3C] bg-[#E8F5EE] px-2.5 py-1 rounded-full">
+                Priority {submittedIssue.priorityScore}
+              </span>
+            ) : (
+              <span className="text-xs text-[#6F6F6F]">Preparing...</span>
+            )}
+          </div>
+          <p className="text-xs text-[#0D0D0B] leading-relaxed">
+            {submittedIssue?.citizenGuidance?.issueSummary || submittedIssue?.authoritySummary || 'JanSeva AI is analyzing priority, department, safety guidance, and next steps.'}
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-xl bg-[#F7F7F5] p-2">
+              <span className="block text-[#6F6F6F]">Department</span>
+              <strong className="text-[#0D0D0B]">{submittedIssue?.department || aiResult?.department || 'Assigning'}</strong>
+            </div>
+            <div className="rounded-xl bg-[#F7F7F5] p-2">
+              <span className="block text-[#6F6F6F]">Severity</span>
+              <strong className="text-[#0D0D0B]">{submittedIssue?.aiSeverity || submittedIssue?.severity || aiResult?.severity || severity}</strong>
+            </div>
+          </div>
+          {submittedIssue?.citizenGuidance?.personalizedAdvice && (
+            <p className="text-xs text-[#6F6F6F] leading-relaxed">{submittedIssue.citizenGuidance.personalizedAdvice}</p>
+          )}
+          {submittedIssue?.duplicateOf && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-xs font-semibold text-amber-900">Possible existing report found.</p>
+              <p className="text-xs text-amber-800">You can join the existing report to increase its verification count, or continue tracking this new report.</p>
+              <Button fullWidth variant="outline" loading={joiningDuplicate} onClick={handleJoinDuplicate}>
+                Join existing report
+              </Button>
+            </div>
+          )}
+        </div>
 
         {/* Primary CTAs */}
         <div className="mt-8 flex flex-col gap-3 w-full">
@@ -275,7 +355,7 @@ export default function ReportForm() {
 
           <div>
             <p className="text-sm font-medium text-[#0D0D0B] mb-2">Severity (optional)</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {SEVERITY_OPTIONS.map((s) => (
                 <button
                   key={s}

@@ -1,6 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
+  --font-logo: 'Cormorant Garamond', 'Instrument Serif', 'Bodoni 72', Didot, Georgia, serif;
   --font-display: 'Instrument Serif', Georgia, serif;
   --font-body: 'Inter', system-ui, sans-serif;
 }

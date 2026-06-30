@@ -63,7 +63,7 @@ export async function geocode(query: string): Promise<{ lat: number; lng: number
 }
 
 /** Detect ward from coordinates (mock — real impl would hit a PostGIS endpoint) */
-export function detectZone(lat: number, lng: number): string {
+export function detectZone(lat: number, _lng: number): string {
   // Round to 2 decimals to group nearby points into "wards"
   const wardN = Math.abs(Math.round(lat * 10)) % 20 + 1;
   return `Ward ${wardN}`;
