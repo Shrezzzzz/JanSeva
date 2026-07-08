@@ -54,7 +54,18 @@ export async function updateIssueStatus(id: string, status: string, note?: strin
 }
 
 export async function upvoteIssue(id: string): Promise<{ upvotes: number }> {
-  const res = await api.post<ApiResponse<{ upvotes: number }>>(`/issues/${id}/upvote`);
+  try {
+    const res = await api.post<ApiResponse<{ upvotes: number }>>(`/issues/${id}/upvote`);
+    return res.data.data;
+  } catch (err) {
+    // Re-throw with the friendly message already set by the api interceptor so
+    // callers (e.g. useUpvote) can show it directly.
+    throw err;
+  }
+}
+
+export async function followIssue(id: string): Promise<{ following: boolean; followers: number }> {
+  const res = await api.post<ApiResponse<{ following: boolean; followers: number }>>(`/issues/${id}/follow`);
   return res.data.data;
 }
 

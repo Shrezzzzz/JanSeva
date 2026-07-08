@@ -275,6 +275,38 @@ export async function upvoteIssue(req: AuthRequest, res: Response) {
   }
 }
 
+// --- POST /api/issues/:id/follow (toggle) ---
+export async function followIssue(req: AuthRequest, res: Response) {
+  try {
+    if (!req.userId) return res.status(401).json({ success: false, error: 'Login required' });
+
+    const issue = await prisma.issue.findUnique({ where: { id: req.params.id } });
+    if (!issue) return res.status(404).json({ success: false, error: 'Issue not found' });
+
+    const alreadyFollowing = (issue.followedBy as string[]).includes(req.userId);
+
+    const updated = await prisma.issue.update({
+      where: { id: req.params.id },
+      data: {
+        followedBy: alreadyFollowing
+          ? { set: (issue.followedBy as string[]).filter((id) => id !== req.userId) }
+          : { push: req.userId },
+      },
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        following: !alreadyFollowing,
+        followers: (updated.followedBy as string[]).length,
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Failed to update follow status';
+    return res.status(500).json({ success: false, error: msg });
+  }
+}
+
 // --- POST /api/issues/:id/comments ---
 export async function addComment(req: AuthRequest, res: Response) {
   try {

@@ -47,17 +47,19 @@ export async function generateGeminiJSON<T>(prompt: string, fallback: T, options
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
-      throw new Error(`Gemini API error: ${response.status} ${errBody}`.trim());
+      console.error(`[Gemini] API error ${response.status}: ${errBody}`.trim());
+      return fallback;
     }
 
     const data = (await response.json()) as GeminiResponse;
     const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') ?? '';
     return safeParseJSON<T>(text) ?? fallback;
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Gemini API timed out');
-    }
-    throw error;
+    // Catch network errors, AbortError (timeout), parse errors — always return
+    // fallback so callers are never broken by a Gemini outage.
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(`[Gemini] Request failed (returning fallback): ${reason}`);
+    return fallback;
   } finally {
     if (timeout) clearTimeout(timeout);
   }

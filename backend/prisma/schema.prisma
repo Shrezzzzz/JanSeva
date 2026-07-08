@@ -100,6 +100,7 @@ model Issue {
 
   upvotes      Int       @default(0)
   verifiedBy   String[]
+  followedBy   String[]
 
   duplicateOf  String?
   duplicateConfidence Float?

@@ -103,3 +103,30 @@ export async function getMe(req: AuthRequest, res: Response) {
     return res.status(500).json({ success: false, error: 'Failed to fetch user' });
   }
 }
+
+/** POST /api/auth/select-ward
+ *  Ward Officer selects their active ward for the session.
+ *  This does NOT persist to the DB — the frontend stores it in authStore.
+ *  The endpoint just validates the ward value and confirms the user is a Ward Officer. */
+export async function selectWard(req: AuthRequest, res: Response) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { id: true, role: true, ward: true },
+    });
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    if (user.role !== 'Authority') {
+      return res.status(403).json({ success: false, error: 'Only Ward Officers can select a ward' });
+    }
+
+    const { ward } = req.body;
+    if (!ward || typeof ward !== 'string' || !ward.trim()) {
+      return res.status(400).json({ success: false, error: 'ward is required' });
+    }
+
+    // Accept any non-empty ward string — the frontend validates the allowed list
+    return res.json({ success: true, data: { activeWard: ward.trim() } });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to select ward' });
+  }
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '../../../hooks/useAuth';
+import { useAuthStore } from '../../../store/authStore';
 import api from '../../../services/api';
 import {
   ClipboardCheck, Eye, ArrowUpDown, Clock, CheckCircle2, RotateCcw,
@@ -43,8 +43,9 @@ function severityDot(sev: string) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function VerificationQueue() {
-  const { user } = useAuth();
-  const ward = user?.ward ?? null;
+  const { effectiveWard } = useAuthStore();
+  // Use session-selected ward for shared officer account, or DB ward for legacy accounts
+  const ward = effectiveWard() ?? null;
 
   const [issues,          setIssues]          = useState<VerificationIssue[]>([]);
   const [loading,         setLoading]         = useState(true);
@@ -55,18 +56,21 @@ export default function VerificationQueue() {
   const fetchIssues = useCallback(async () => {
     setLoading(true);
     try {
-      // Ward officer auth-where clause on backend already scopes to
-      // zone=ward AND status=NeedsVerification — no extra params needed.
-      const res = await api.get('/authority/issues');
+      // Pass ward as a query param so the shared officer account
+      // (no DB ward) gets correctly scoped to their session-selected ward.
+      const wardQ = ward && ward !== 'All' && ward !== 'City-Wide'
+        ? `?ward=${encodeURIComponent(ward)}`
+        : '';
+      const res = await api.get(`/authority/issues${wardQ}`);
       if (res.data.success) setIssues(res.data.data as VerificationIssue[]);
     } catch (err) {
       console.error('Failed to load verification queue', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ward]);
 
-  useEffect(() => { void fetchIssues(); }, [fetchIssues]);
+  useEffect(() => { void fetchIssues(); }, [fetchIssues, ward]);
 
   // ── Sort ──────────────────────────────────────────────────────────────────
 

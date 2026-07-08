@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import {
   getIssues, getIssueById, createIssue, updateIssueStatus,
-  upvoteIssue, addComment, getIssuesForMap, getNearbyIssues,
+  upvoteIssue, followIssue, addComment, getIssuesForMap, getNearbyIssues,
   updateIssue, deleteIssue, joinDuplicateIssue,
 } from '../controllers/issueController';
 import { authMiddleware, optionalAuth, requireRole, AuthRequest } from '../middleware/auth';
@@ -26,6 +26,7 @@ router.get('/:id',     optionalAuth, getIssueById);
 // Authenticated citizens (optional auth — anonymous submissions allowed)
 router.post('/',               optionalAuth,  createIssue);
 router.post('/:id/upvote',     authMiddleware, upvoteIssue);
+router.post('/:id/follow',     authMiddleware, followIssue);
 router.post('/:id/join-duplicate', optionalAuth, joinDuplicateIssue);
 router.post('/:id/comments',   authMiddleware, addComment);
 
@@ -104,7 +105,13 @@ export async function getAuthorityIssuesHandler(req: Request, res: Response) {
   if (Object.values(Status).includes(status as Status)) where.status = status as Status;
   if (Object.values(Severity).includes(severity as Severity)) where.severity = severity as Severity;
 
-  const authorityWhere = getAuthorityWhereClause(user);
+  // For the shared Ward Officer account (no DB ward), use the ?ward= query param
+  // passed from the frontend session picker to scope the authority where-clause correctly.
+  const effectiveUser = (ward && ward !== 'All' && ward !== 'City-Wide' && !user.ward)
+    ? { ...user, ward }
+    : user;
+
+  const authorityWhere = getAuthorityWhereClause(effectiveUser);
 
   // Ward officers are always scoped to NeedsVerification — never apply inbox/my_cases scope overrides for them.
   // The ward officer where-clause already hard-codes status: 'NeedsVerification' in getAuthorityWhereClause.
@@ -192,6 +199,59 @@ export async function getAuthorityIssuesHandler(req: Request, res: Response) {
     slaBreached: (Date.now() - new Date(i.createdAt).getTime()) > 72 * 3600000,
   }));
   res.json({ success: true, data: withSLA });
+}
+
+export async function getAuthorityStatsHandler(req: Request, res: Response) {
+  const authReq = req as AuthRequest;
+  const user = authReq.userId
+    ? await prisma.user.findUnique({
+        where: { id: authReq.userId },
+        select: { email: true, role: true, ward: true },
+      })
+    : null;
+  if (!user) return res.status(401).json({ success: false, error: 'Please sign in to continue.' });
+
+  // Honour an explicit ?ward= param (used when ward officer selects their ward
+  // via the session picker rather than a DB-persisted ward value).
+  const wardParam = typeof req.query.ward === 'string' && req.query.ward !== 'All' && req.query.ward !== 'City-Wide'
+    ? req.query.ward
+    : null;
+
+  // Build the base where-clause scoped to this user's role.
+  // For a ward officer whose ward is being passed as a query param, inject it.
+  const effectiveUser = wardParam ? { ...user, ward: wardParam } : user;
+  const baseWhere = getAuthorityWhereClause(effectiveUser);
+
+  const SLA_BREACH_HOURS = 72;
+  const slaBreachCutoff = new Date(Date.now() - SLA_BREACH_HOURS * 3_600_000);
+
+  const [openIssues, activeWork, needsVerification, slaBreached] = await Promise.all([
+    // Open: every status except Resolved + Closed
+    prisma.issue.count({
+      where: { ...baseWhere, status: { notIn: ['Resolved', 'Closed'] } },
+    }),
+    // Active work: Accepted or InProgress
+    prisma.issue.count({
+      where: { ...baseWhere, status: { in: ['Accepted', 'InProgress'] } },
+    }),
+    // Pending field verification
+    prisma.issue.count({
+      where: { ...baseWhere, status: 'NeedsVerification' },
+    }),
+    // SLA breached: open issues older than 72 h
+    prisma.issue.count({
+      where: {
+        ...baseWhere,
+        status: { notIn: ['Resolved', 'Closed'] },
+        createdAt: { lt: slaBreachCutoff },
+      },
+    }),
+  ]);
+
+  return res.json({
+    success: true,
+    data: { openIssues, activeWork, needsVerification, slaBreached },
+  });
 }
 
 export async function getAuthorityActivityHandler(req: Request, res: Response) {
@@ -642,11 +702,20 @@ export async function getWardStatsHandler(req: Request, res: Response) {
   if (!user) return res.status(401).json({ success: false, error: 'Please sign in to continue.' });
 
   const { isWardOfficer: _isWO, isCityAdmin: _isCityAdmin } = await import('../services/authorityAssignmentService');
-  if (!_isWO(user) && !_isCityAdmin(user)) {
+
+  // For the shared Ward Officer account (no DB ward), accept ?ward= from the session picker.
+  const wardParam = typeof req.query.ward === 'string' && req.query.ward !== 'All' && req.query.ward !== 'City-Wide'
+    ? req.query.ward
+    : null;
+  const effectiveUser = wardParam ? { ...user, ward: wardParam } : user;
+
+  if (!_isWO(effectiveUser) && !_isCityAdmin(effectiveUser)) {
     return res.status(403).json({ success: false, error: 'Access restricted to Ward Officers' });
   }
 
-  const ward = user.ward && user.ward !== 'All' && user.ward !== 'City-Wide' ? user.ward : undefined;
+  const ward = effectiveUser.ward && effectiveUser.ward !== 'All' && effectiveUser.ward !== 'City-Wide'
+    ? effectiveUser.ward
+    : undefined;
   const wardFilter: Prisma.IssueWhereInput = ward ? { zone: ward } : {};
 
   const today = new Date();

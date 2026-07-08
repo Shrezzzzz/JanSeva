@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../../hooks/useAuth';
+import { useAuthStore } from '../../../store/authStore';
 import api from '../../../services/api';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -86,8 +86,8 @@ type WardBrief = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function WardOfficerDashboard() {
-  const { user } = useAuth();
   const navigate = useNavigate();
+  const { effectiveWard } = useAuthStore();
 
   const [stats,        setStats]        = useState<WardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -96,7 +96,8 @@ export default function WardOfficerDashboard() {
   const [brief,        setBrief]        = useState<WardBrief | null>(null);
   const [briefLoading, setBriefLoading] = useState(true);
 
-  const ward = user?.ward ?? null;
+  // Use session-selected ward (shared officer account) or DB ward (legacy accounts)
+  const ward = effectiveWard() ?? null;
 
   useEffect(() => {
     let active = true;
@@ -105,9 +106,9 @@ export default function WardOfficerDashboard() {
       ? `?ward=${encodeURIComponent(ward)}`
       : '';
 
-    // Ward stats
+    // Ward stats — pass ward param so backend scopes correctly for session-selected ward
     setStatsLoading(true);
-    api.get('/authority/ward-stats')
+    api.get(`/authority/ward-stats${wardQ}`)
       .then((r) => { if (active && r.data.success) setStats(r.data.data); })
       .catch(() => {})
       .finally(() => { if (active) setStatsLoading(false); });

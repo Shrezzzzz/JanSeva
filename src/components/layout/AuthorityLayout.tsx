@@ -1,9 +1,11 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useAuthStore } from '../../store/authStore';
 import { LogOut, Shield } from 'lucide-react';
 import BrandLogo from '../brand/BrandLogo';
 import { DEPARTMENTS } from '../../config/departments';
+import WardSelector from '../authority/WardSelector';
 
 // ── Role helpers ──────────────────────────────────────────────────────────────
 
@@ -81,6 +83,7 @@ function getMobileNavItems(role: string, email: string, ward?: string | null) {
 
 export default function AuthorityLayout({ children }: { children?: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  const { effectiveWard } = useAuthStore();
   const navigate  = useNavigate();
   const location  = useLocation();
 
@@ -92,12 +95,23 @@ export default function AuthorityLayout({ children }: { children?: React.ReactNo
 
   const role  = user?.role  ?? '';
   const email = user?.email ?? '';
-  const ward  = user?.ward  ?? null;
+  // Use effectiveWard() so the shared Ward Officer account gets the
+  // session-selected ward rather than the (null) DB value.
+  const ward  = effectiveWard() ?? null;
+
+  // Ward Officer with no active ward selected yet → show picker
+  const isSharedWardOfficer = role === 'Authority' && !user?.ward;
+  const needsWardSelection  = isSharedWardOfficer && !ward;
 
   const roleLabel  = getRoleLabel(role, email, ward);
   const badgeCls   = getRoleBadgeColors(role, email, ward);
   const navItems   = getNavItems(role, email, ward);
   const mobileItems = getMobileNavItems(role, email, ward);
+
+  // Show ward picker fullscreen until the Ward Officer selects their ward
+  if (needsWardSelection) {
+    return <WardSelector />;
+  }
 
   return (
     <div className="min-h-screen bg-[#F0F4F0] flex flex-col">

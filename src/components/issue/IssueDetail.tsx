@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, MapPin, Share2, Bell, ExternalLink } from 'lucide-react';
+import { X, MapPin, Share2, Bell, BellOff, ExternalLink } from 'lucide-react';
 import type { Issue, Comment } from '../../types/issue.types';
 import { CategoryBadge, StatusBadge, SeverityBadge } from '../ui/Badge';
 import Avatar, { AvatarStack } from '../ui/Avatar';
@@ -10,6 +10,9 @@ import IssueTimeline from './IssueTimeline';
 import CommentThread from './CommentThread';
 import { timeAgo, issueIdDisplay } from '../../utils/formatters';
 import { ROUTES } from '../../config/routes';
+import { followIssue } from '../../services/issueService';
+import { useAuthStore } from '../../store/authStore';
+import { useUIStore } from '../../store/uiStore';
 
 interface IssueDetailProps {
   issue: Issue;
@@ -19,8 +22,40 @@ interface IssueDetailProps {
 
 export default function IssueDetail({ issue, onClose, onCommentAdded }: IssueDetailProps) {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const { addToast, openLogin } = useUIStore();
   const [comments, setComments] = useState<Comment[]>(issue.comments ?? []);
   const [tab, setTab]           = useState<'timeline' | 'comments'>('timeline');
+
+  // Follow state — initialise from the issue's followedBy list if available
+  const [following, setFollowing] = useState<boolean>(
+    !!user && (issue.followedBy ?? []).includes(user.id),
+  );
+  const [followPending, setFollowPending] = useState(false);
+
+  const handleFollow = async () => {
+    if (!user) { openLogin(); return; }
+    if (followPending) return;
+    // Optimistic toggle
+    setFollowing((prev) => !prev);
+    setFollowPending(true);
+    try {
+      const result = await followIssue(issue.id);
+      setFollowing(result.following);
+      addToast({
+        type: 'success',
+        title: result.following ? 'Following issue' : 'Unfollowed issue',
+      });
+    } catch (err) {
+      // Revert on failure
+      setFollowing((prev) => !prev);
+      const message =
+        err instanceof Error && err.message ? err.message : 'Failed to update follow status.';
+      addToast({ type: 'error', title: message });
+    } finally {
+      setFollowPending(false);
+    }
+  };
 
   const addComment = (c: Comment) => {
     setComments((prev) => [...prev, c]);
@@ -134,8 +169,18 @@ export default function IssueDetail({ issue, onClose, onCommentAdded }: IssueDet
 
       {/* Footer actions */}
       <div className="border-t border-[#E5E5E0] p-4 flex gap-3">
-        <button className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#E5E5E0] text-sm text-[#6F6F6F] hover:bg-[#F7F7F5] transition-colors">
-          <Bell size={14} /> Follow
+        <button
+          onClick={handleFollow}
+          disabled={followPending}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm transition-colors ${
+            following
+              ? 'border-[#1A6B3C] text-[#1A6B3C] bg-[#F0FAF4] hover:bg-[#E6F5EC]'
+              : 'border-[#E5E5E0] text-[#6F6F6F] hover:bg-[#F7F7F5]'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+          aria-label={following ? 'Unfollow issue' : 'Follow issue'}
+        >
+          {following ? <BellOff size={14} /> : <Bell size={14} />}
+          {following ? 'Following' : 'Follow'}
         </button>
         <button
           onClick={() => navigator.clipboard.writeText(`${window.location.origin}/track/${issue.id}`)}

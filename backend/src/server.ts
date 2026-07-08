@@ -103,12 +103,13 @@ export function broadcastNewIssue(issue: unknown) {
 }
 
 // ── API routes ────────────────────────────────────────────────────────────────
-import { getAuthorityActivityHandler, getAuthorityIssuesHandler, getWardStatsHandler } from './routes/issues';
+import { getAuthorityActivityHandler, getAuthorityIssuesHandler, getAuthorityStatsHandler, getWardStatsHandler } from './routes/issues';
 import { authMiddleware, requireRole } from './middleware/auth';
 
-app.get('/api/authority/issues',     authMiddleware, requireRole(['Authority', 'Admin']), getAuthorityIssuesHandler);
-app.get('/api/authority/activity',   authMiddleware, requireRole(['Authority', 'Admin']), getAuthorityActivityHandler);
-app.get('/api/authority/ward-stats', authMiddleware, requireRole(['Authority', 'Admin']), getWardStatsHandler);
+app.get('/api/authority/issues',       authMiddleware, requireRole(['Authority', 'Admin']), getAuthorityIssuesHandler);
+app.get('/api/authority/issues/stats', authMiddleware, requireRole(['Authority', 'Admin']), getAuthorityStatsHandler);
+app.get('/api/authority/activity',     authMiddleware, requireRole(['Authority', 'Admin']), getAuthorityActivityHandler);
+app.get('/api/authority/ward-stats',   authMiddleware, requireRole(['Authority', 'Admin']), getWardStatsHandler);
 
 app.use('/api/auth',      authRoutes);
 app.use('/api/issues',    issueRoutes);

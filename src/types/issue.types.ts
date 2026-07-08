@@ -67,6 +67,7 @@ export interface Issue {
   reporterAvatar?: string;
   upvotes: number;
   verifiedBy: string[];
+  followedBy?: string[];
   duplicateOf?: string;
   duplicateConfidence?: number;
   aiCategory?: string;
