@@ -277,6 +277,18 @@ npm run dev
 
 ---
 
+## 🔄 Automation (n8n)
+
+Critical civic issues trigger an automated alert workflow built in n8n:
+
+Webhook Trigger → Severity Check (If) → 
+
+  ├─ Critical → Gmail Alert → Log to Sheet
+
+  └─ Non-Critical → Log to Sheet
+
+Workflow JSON: [`automation:janseva-alert-workflow.json`](./automation:janseva-alert-workflow.json)
+
 # 📡 API Modules
 
 ### Authentication
