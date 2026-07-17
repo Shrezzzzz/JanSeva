@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import Layout from './components/layout/Layout';
 import Spinner from './components/ui/Spinner';
@@ -35,6 +35,14 @@ function PageLoader() {
   );
 }
 
+// Remounts ReportPage on every navigation to /report (including same-route clicks)
+// so ReportForm's local state (step, fields, success screen) always resets.
+function KeyedReportPage() {
+  const { key } = useLocation();
+  const Page = ReportPage as React.ComponentType;
+  return <Page key={key} />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -61,7 +69,7 @@ export default function App() {
 
           <Route element={<Layout />}>
             <Route path={ROUTES.CITIZEN}      element={<LandingPage />}      />
-            <Route path={ROUTES.REPORT}       element={<ReportPage />}       />
+            <Route path={ROUTES.REPORT}       element={<KeyedReportPage />}  />
             <Route path={ROUTES.MAP}          element={<MapPage />}          />
             <Route path={ROUTES.TRACK}        element={<TrackPage />}        />
             <Route path={ROUTES.TRACK_ISSUE}  element={<TrackPage />}        />
