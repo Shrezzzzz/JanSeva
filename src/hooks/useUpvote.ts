@@ -10,7 +10,12 @@ function isMockIssueId(id: string): boolean {
   return /^(mock|demo)/i.test(id);
 }
 
-export function useUpvote(issueId: string, verifiedBy: string[]) {
+export function useUpvote(
+  issueId: string,
+  verifiedBy: string[],
+  onOptimisticVote?: (userId: string) => void,
+  onVoteRevert?: (userId: string) => void,
+) {
   const { optimisticUpvote } = useIssueStore();
   const { user } = useAuthStore();
   const { addToast, openLogin } = useUIStore();
@@ -23,6 +28,7 @@ export function useUpvote(issueId: string, verifiedBy: string[]) {
     if (hasVoted || pending) return;
     setPending(true);
     optimisticUpvote(issueId, user.id);
+    onOptimisticVote?.(user.id);
 
     // Mock / demo issues have no backend row — skip the API call and just
     // keep the optimistic update so the UI feels responsive.
@@ -34,7 +40,8 @@ export function useUpvote(issueId: string, verifiedBy: string[]) {
     try {
       await upvoteIssue(issueId);
     } catch (err) {
-      // Revert optimistic update and surface the real server error message.
+      // Revert optimistic update in store, in local parent state, and surface error.
+      onVoteRevert?.(user.id);
       const message =
         err instanceof Error && err.message
           ? err.message
@@ -43,7 +50,7 @@ export function useUpvote(issueId: string, verifiedBy: string[]) {
     } finally {
       setPending(false);
     }
-  }, [user, hasVoted, pending, issueId, optimisticUpvote, addToast, openLogin]);
+  }, [user, hasVoted, pending, issueId, optimisticUpvote, onOptimisticVote, onVoteRevert, addToast, openLogin]);
 
   return { vote, hasVoted, pending };
 }

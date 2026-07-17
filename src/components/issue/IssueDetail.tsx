@@ -18,9 +18,11 @@ interface IssueDetailProps {
   issue: Issue;
   onClose: () => void;
   onCommentAdded?: (c: Comment) => void;
+  onOptimisticVote?: (userId: string) => void;
+  onVoteRevert?: (userId: string) => void;
 }
 
-export default function IssueDetail({ issue, onClose, onCommentAdded }: IssueDetailProps) {
+export default function IssueDetail({ issue, onClose, onCommentAdded, onOptimisticVote, onVoteRevert }: IssueDetailProps) {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { addToast, openLogin } = useUIStore();
@@ -143,6 +145,8 @@ export default function IssueDetail({ issue, onClose, onCommentAdded }: IssueDet
               verifiedBy={issue.verifiedBy}
               upvotes={issue.upvotes}
               showProgress
+              onOptimisticVote={onOptimisticVote}
+              onVoteRevert={onVoteRevert}
             />
           </div>
         </div>

@@ -8,12 +8,15 @@ interface VerifyButtonProps {
   upvotes: number;
   targetCount?: number;
   showProgress?: boolean;
+  onOptimisticVote?: (userId: string) => void;
+  onVoteRevert?: (userId: string) => void;
 }
 
 export default function VerifyButton({
   issueId, verifiedBy, upvotes, targetCount = 10, showProgress = false,
+  onOptimisticVote, onVoteRevert,
 }: VerifyButtonProps) {
-  const { vote, hasVoted, pending } = useUpvote(issueId, verifiedBy);
+  const { vote, hasVoted, pending } = useUpvote(issueId, verifiedBy, onOptimisticVote, onVoteRevert);
   const pct = Math.min((upvotes / targetCount) * 100, 100);
 
   return (

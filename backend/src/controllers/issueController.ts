@@ -8,6 +8,7 @@ import { notifyStatusUpdate } from '../services/notificationService';
 import { isValidCoords } from '../utils/validators';
 import { broadcastNewIssue } from '../server';
 import { analyzeIssue } from '../ai/decisionEngine';
+import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
@@ -148,6 +149,26 @@ export async function createIssue(req: AuthRequest, res: Response) {
     }
 
     const enrichedIssue = await prisma.issue.findUnique({ where: { id: issue.id } });
+
+    // Fire-and-forget n8n alert webhook (does not block the citizen response)
+    const webhookUrl = process.env.N8N_ALERT_WEBHOOK_URL;
+    if (webhookUrl) {
+      const payload = enrichedIssue ?? issue;
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id:         payload.id,
+          title:      payload.title,
+          category:   payload.category,
+          severity:   payload.severity,
+          address:    payload.address,
+          zone:       payload.zone,
+          createdAt:  payload.createdAt,
+          department: payload.department,
+        }),
+      }).catch((err) => logger.error('n8n webhook dispatch failed', err));
+    }
 
     return res.status(201).json({ success: true, data: enrichedIssue ?? issue });
   } catch (e) {

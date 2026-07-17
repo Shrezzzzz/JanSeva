@@ -33,6 +33,9 @@
     "node-cron": "^4.5.0",
     "prisma": "^5.16.0"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.7.5",

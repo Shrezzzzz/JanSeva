@@ -287,7 +287,7 @@ Webhook Trigger → Severity Check (If) →
 
   └─ Non-Critical → Log to Sheet
 
-Workflow JSON: [`automation:janseva-alert-workflow.json`](./automation:janseva-alert-workflow.json)
+Workflow JSON: [`automation/janseva-critical-alert-workflow.json`](./automation/janseva-critical-alert-workflow.json)
 
 # 📡 API Modules
 

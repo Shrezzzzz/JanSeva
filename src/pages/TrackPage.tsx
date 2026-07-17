@@ -148,7 +148,26 @@ export default function TrackPage() {
 
         {issue && (
           <div className="bg-white rounded-3xl border border-[#E5E5E0] shadow-sm overflow-hidden">
-            <IssueDetail issue={issue} onClose={() => { setIssue(null); lastStatusRef.current = null; }} />
+            <IssueDetail
+              issue={issue}
+              onClose={() => { setIssue(null); lastStatusRef.current = null; }}
+              onOptimisticVote={(userId) => {
+                setIssue((prev) =>
+                  prev ? { ...prev, upvotes: prev.upvotes + 1, verifiedBy: [...prev.verifiedBy, userId] } : prev,
+                );
+              }}
+              onVoteRevert={(userId) => {
+                setIssue((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        upvotes: Math.max(0, prev.upvotes - 1),
+                        verifiedBy: prev.verifiedBy.filter((id) => id !== userId),
+                      }
+                    : prev,
+                );
+              }}
+            />
           </div>
         )}
 

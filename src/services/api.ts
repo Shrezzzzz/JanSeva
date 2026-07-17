@@ -3,7 +3,7 @@ import env from '../config/env';
 
 const api = axios.create({
   baseURL: env.API_BASE_URL,
-  timeout: 30_000,
+  timeout: 60_000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -34,6 +34,22 @@ function friendlyErrorMessage(err: unknown): string {
       return 'Something went wrong. Please try again.';
   }
 }
+
+// Retry once on network errors (no response received — server unreachable, ECONNRESET, etc.)
+// Does NOT retry on 4xx/5xx — those are application errors, not transient network failures.
+const MAX_RETRIES = 1;
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    const config = err.config as typeof err.config & { _retryCount?: number };
+    if (!err.response && config && (config._retryCount ?? 0) < MAX_RETRIES) {
+      config._retryCount = (config._retryCount ?? 0) + 1;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      return api(config);
+    }
+    return Promise.reject(err);
+  },
+);
 
 // Attach JWT on every request
 api.interceptors.request.use((config) => {
