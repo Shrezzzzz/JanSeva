@@ -142,35 +142,52 @@ export async function createIssue(req: AuthRequest, res: Response) {
     // Broadcast to SSE clients
     broadcastNewIssue(issue);
 
-    try {
-      await analyzeIssue(issue.id);
-    } catch (error) {
-      console.error('AI enrichment failed; report remains submitted:', error);
-    }
+    // Respond to the citizen immediately — AI enrichment runs in the background.
+    // department/category will be null on the initial response and populated
+    // within seconds as the background task completes. The ReportForm polls
+    // fetchIssueById every 2.5s to pick up the enriched fields.
+    res.status(201).json({ success: true, data: issue });
 
-    const enrichedIssue = await prisma.issue.findUnique({ where: { id: issue.id } });
-
-    // Fire-and-forget n8n alert webhook (does not block the citizen response)
-    const webhookUrl = process.env.N8N_ALERT_WEBHOOK_URL;
-    if (webhookUrl) {
-      const payload = enrichedIssue ?? issue;
-      fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id:         payload.id,
-          title:      payload.title,
-          category:   payload.category,
-          severity:   payload.severity,
-          address:    payload.address,
-          zone:       payload.zone,
-          createdAt:  payload.createdAt,
-          department: payload.department,
-        }),
-      }).catch((err) => logger.error('n8n webhook dispatch failed', err));
-    }
-
-    return res.status(201).json({ success: true, data: enrichedIssue ?? issue });
+    // Background: AI enrichment + n8n webhook.
+    // analyzeIssue() is an async function — any synchronous throw inside it becomes
+    // a rejected promise. Both resolve(null) and reject(...) are explicitly handled:
+    //   resolve(analysis) → fire n8n webhook with enriched department field
+    //   resolve(null)     → early return, no webhook (issue not found — shouldn't happen)
+    //   reject(err)       → .catch() logs + writes aiFailureReason to DB, never crashes
+    analyzeIssue(issue.id)
+      .then((analysis) => {
+        if (!analysis) return;
+        // n8n alert fires after enrichment so department is populated in the payload.
+        const webhookUrl = process.env.N8N_ALERT_WEBHOOK_URL;
+        if (!webhookUrl) return;
+        // Re-fetch the fully-written issue row so all AI fields are present.
+        prisma.issue.findUnique({ where: { id: issue.id } })
+          .then((enriched) => {
+            const payload = enriched ?? issue;
+            fetch(webhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id:         payload.id,
+                title:      payload.title,
+                category:   payload.category,
+                severity:   payload.severity,
+                address:    payload.address,
+                zone:       payload.zone,
+                createdAt:  payload.createdAt,
+                department: payload.department,
+              }),
+            }).catch((err) => logger.error('n8n webhook dispatch failed', err));
+          })
+          .catch((err) => logger.error('Post-enrichment issue re-fetch failed', err));
+      })
+      .catch(async (err) => {
+        logger.error(`Background AI enrichment failed for issue ${issue.id}`, err);
+        await prisma.issue.update({
+          where: { id: issue.id },
+          data: { aiFailureReason: err instanceof Error ? err.message : 'AI enrichment failed' },
+        }).catch(() => null);
+      });
   } catch (e) {
     console.error('createIssue error:', e);
     const msg = 'Something went wrong while submitting your report. Please try again.';
