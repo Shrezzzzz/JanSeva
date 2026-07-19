@@ -26,7 +26,12 @@ const AUTHORITY_ACCOUNTS = [
   { name: 'Water Department Officer', email: 'water@janseva.gov', password: 'Water@123', role: 'Authority' as const, ward: 'All' },
   { name: 'Waste Management Officer', email: 'waste@janseva.gov', password: 'Waste@123', role: 'Authority' as const, ward: 'All' },
   { name: 'Electricity Department Officer', email: 'electricity@janseva.gov', password: 'Electricity@123', role: 'Authority' as const, ward: 'All' },
-  { name: 'Ward Officer', email: 'officer@janseva.gov', password: 'Officer@123', role: 'Authority' as const, ward: 'Ward 1' },
+  // ward: null is intentional — officer@janseva.gov is the SHARED Ward Officer account.
+  // The officer selects their ward each session via the WardSelector modal (stored in
+  // authStore.activeWard, never persisted to DB). Do NOT change this back to a specific
+  // ward — doing so would break the shared-officer pattern and re-lock the account to
+  // one ward permanently. See: src/components/authority/WardSelector.tsx
+  { name: 'Ward Officer', email: 'officer@janseva.gov', password: 'Officer@123', role: 'Authority' as const, ward: null },
 ];
 
 function rand<T>(arr: readonly T[]): T {
