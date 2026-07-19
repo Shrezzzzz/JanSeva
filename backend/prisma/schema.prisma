@@ -34,6 +34,8 @@ enum Severity {
 enum Status {
   Reported
   Verified
+  AwaitingAssignment
+  FlaggedFalse
   Assigned
   Accepted
   InProgress
@@ -67,6 +69,7 @@ model User {
   badges          String[]
   reportStreak    Int       @default(0)
   activeCharacter String    @default("male-0-explorer")
+  suspendedUntil  DateTime?
 
   issues       Issue[]
   comments     Comment[]
@@ -129,6 +132,7 @@ model Issue {
   aiFailureReason         String?
 
   assignedTo              String?
+  wardFlagNote            String?
   completionNotes         String?
   completionPhotos        String[]
   internalNotes           InternalNote[]
