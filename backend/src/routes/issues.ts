@@ -561,7 +561,14 @@ router.post('/:id/verify-approve', authMiddleware, requireRole(['Authority', 'Ad
     if (!user) return res.status(401).json({ success: false, error: 'Unauthorised' });
 
     const { isWardOfficer: _isWardOfficer, isCityAdmin: _isCityAdmin } = await import('../services/authorityAssignmentService');
-    if (!_isWardOfficer(user) && !_isCityAdmin(user)) {
+    // For the shared Ward Officer account (no DB ward), accept the session-selected
+    // ward from the ?ward= query param — same pattern as other authority handlers.
+    const wardParam = typeof req.query.ward === 'string' && req.query.ward.trim()
+      ? req.query.ward.trim()
+      : null;
+    const effectiveUser = wardParam && !user.ward ? { ...user, ward: wardParam } : user;
+
+    if (!_isWardOfficer(effectiveUser) && !_isCityAdmin(effectiveUser)) {
       return res.status(403).json({ success: false, error: 'Only Ward Officers can approve resolutions' });
     }
 
@@ -574,7 +581,7 @@ router.post('/:id/verify-approve', authMiddleware, requireRole(['Authority', 'Ad
       return res.status(409).json({ success: false, error: `Cannot approve an issue in status: ${issue.status}` });
     }
     // Ward officer can only approve issues in their ward
-    if (_isWardOfficer(user) && issue.zone !== user.ward) {
+    if (_isWardOfficer(effectiveUser) && issue.zone !== effectiveUser.ward) {
       return res.status(403).json({ success: false, error: 'This issue is not in your ward' });
     }
 
@@ -635,7 +642,14 @@ router.post('/:id/verify-reject', authMiddleware, requireRole(['Authority', 'Adm
     if (!user) return res.status(401).json({ success: false, error: 'Unauthorised' });
 
     const { isWardOfficer: _isWardOfficer, isCityAdmin: _isCityAdmin } = await import('../services/authorityAssignmentService');
-    if (!_isWardOfficer(user) && !_isCityAdmin(user)) {
+    // For the shared Ward Officer account (no DB ward), accept the session-selected
+    // ward from the ?ward= query param — same pattern as other authority handlers.
+    const wardParam = typeof req.query.ward === 'string' && req.query.ward.trim()
+      ? req.query.ward.trim()
+      : null;
+    const effectiveUser = wardParam && !user.ward ? { ...user, ward: wardParam } : user;
+
+    if (!_isWardOfficer(effectiveUser) && !_isCityAdmin(effectiveUser)) {
       return res.status(403).json({ success: false, error: 'Only Ward Officers can reject resolutions' });
     }
 
@@ -644,7 +658,7 @@ router.post('/:id/verify-reject', authMiddleware, requireRole(['Authority', 'Adm
     if (issue.status !== 'NeedsVerification') {
       return res.status(409).json({ success: false, error: `Cannot reject an issue in status: ${issue.status}` });
     }
-    if (_isWardOfficer(user) && issue.zone !== user.ward) {
+    if (_isWardOfficer(effectiveUser) && issue.zone !== effectiveUser.ward) {
       return res.status(403).json({ success: false, error: 'This issue is not in your ward' });
     }
 

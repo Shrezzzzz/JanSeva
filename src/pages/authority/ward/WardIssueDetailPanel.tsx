@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../../../services/api';
+import { useAuthStore } from '../../../store/authStore';
 import {
   X, Shield, Eye, ThumbsUp, ThumbsDown, ClipboardCheck,
   MapPin, User, Calendar, Building2, FileText, Camera,
@@ -302,6 +303,9 @@ function DecisionPanel({
   issue: WardIssue;
   onRefresh: () => void;
 }) {
+  const { effectiveWard } = useAuthStore();
+  const ward = effectiveWard();
+
   const [checklist, setChecklist] = useState<Record<ChecklistKey, boolean>>({
     workCompleted: false, locationMatches: false, hazardRemoved: false,
     photosAccurate: false, siteInspectionPassed: false,
@@ -321,7 +325,10 @@ function DecisionPanel({
   const handleApprove = async () => {
     setBusy(true); setError('');
     try {
-      await api.post(`/issues/${issue.id}/verify-approve`, {
+      const wardQ = ward && ward !== 'All' && ward !== 'City-Wide'
+        ? `?ward=${encodeURIComponent(ward)}`
+        : '';
+      await api.post(`/issues/${issue.id}/verify-approve${wardQ}`, {
         verificationNote: verificationNote.trim() || 'Ward Officer completed field inspection and approved resolution.',
       });
       onRefresh();
@@ -334,7 +341,10 @@ function DecisionPanel({
     if (!rejectionNote.trim()) return;
     setBusy(true); setError('');
     try {
-      await api.post(`/issues/${issue.id}/verify-reject`, { rejectionNote: rejectionNote.trim() });
+      const wardQ = ward && ward !== 'All' && ward !== 'City-Wide'
+        ? `?ward=${encodeURIComponent(ward)}`
+        : '';
+      await api.post(`/issues/${issue.id}/verify-reject${wardQ}`, { rejectionNote: rejectionNote.trim() });
       onRefresh();
     } catch (e: any) {
       setError(e?.response?.data?.error ?? 'Failed to reject. Please try again.');
