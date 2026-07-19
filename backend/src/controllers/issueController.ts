@@ -9,6 +9,7 @@ import { isValidCoords } from '../utils/validators';
 import { broadcastNewIssue } from '../server';
 import { analyzeIssue } from '../ai/decisionEngine';
 import { logger } from '../utils/logger';
+import { resolveAuthorityAssignment } from '../services/authorityAssignmentService';
 
 const prisma = new PrismaClient();
 
@@ -122,6 +123,33 @@ export async function createIssue(req: AuthRequest, res: Response) {
         reporterId: req.userId ?? null,
       },
     });
+
+    // Synchronous fallback assignment — write department + assignedTo immediately
+    // using the citizen-submitted category, so the issue appears in the authority
+    // Inbox even if AI enrichment fails or is slow. AI enrichment later overwrites
+    // these with refined values. Status stays 'Reported' — matching the AI path,
+    // which also never writes status (that's a manual authority action).
+    try {
+      const authorityUsers = await prisma.user.findMany({
+        where: { role: { in: ['Authority', 'Admin'] } },
+        select: { id: true, name: true, email: true, role: true, ward: true },
+      });
+      const fallback = resolveAuthorityAssignment(
+        { category: category as Category, department: null, zone: zone ?? null },
+        authorityUsers,
+      );
+      await prisma.issue.update({
+        where: { id: issue.id },
+        data: {
+          department: fallback.department,
+          assignedTo: fallback.assignedTo,
+        },
+      });
+      issue.department = fallback.department;
+      issue.assignedTo = fallback.assignedTo;
+    } catch (err) {
+      logger.error('Fallback assignment failed; issue will be unassigned until AI enrichment runs', err);
+    }
 
     // Timeline entry
     await prisma.timeline.create({
