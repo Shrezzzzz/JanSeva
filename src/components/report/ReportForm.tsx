@@ -41,6 +41,7 @@ export default function ReportForm() {
   const [issueId,     setIssueId]     = useState('');
   const [submittedIssue, setSubmittedIssue] = useState<Issue | null>(null);
   const [joiningDuplicate, setJoiningDuplicate] = useState(false);
+  const [aiPollExhausted,  setAiPollExhausted]  = useState(false);
 
   const handleFirstImage = useCallback(async (file: File) => {
     await analyzeImage(file);
@@ -134,9 +135,15 @@ export default function ReportForm() {
       try {
         const fresh = await fetchIssueById(issueId);
         setSubmittedIssue(fresh);
-        if (fresh.aiAnalyzedAt || attempts >= 8) window.clearInterval(interval);
+        if (fresh.aiAnalyzedAt || attempts >= 8) {
+          window.clearInterval(interval);
+          if (!fresh.aiAnalyzedAt) setAiPollExhausted(true);
+        }
       } catch {
-        if (attempts >= 8) window.clearInterval(interval);
+        if (attempts >= 8) {
+          window.clearInterval(interval);
+          setAiPollExhausted(true);
+        }
       }
     }, 2500);
     return () => window.clearInterval(interval);
@@ -194,17 +201,23 @@ export default function ReportForm() {
               <span className="text-xs font-bold text-[#1A6B3C] bg-[#E8F5EE] px-2.5 py-1 rounded-full">
                 Priority {submittedIssue.priorityScore}
               </span>
+            ) : aiPollExhausted ? (
+              <span className="text-xs text-[#6F6F6F]">Check tracking page</span>
             ) : (
               <span className="text-xs text-[#6F6F6F]">Preparing...</span>
             )}
           </div>
           <p className="text-xs text-[#0D0D0B] leading-relaxed">
-            {submittedIssue?.citizenGuidance?.issueSummary || submittedIssue?.authoritySummary || 'JanSeva AI is analyzing priority, department, safety guidance, and next steps.'}
+            {submittedIssue?.citizenGuidance?.issueSummary || submittedIssue?.authoritySummary || (
+              aiPollExhausted
+                ? 'Still processing — check back on the tracking page for department and priority details.'
+                : 'JanSeva AI is analyzing priority, department, safety guidance, and next steps.'
+            )}
           </p>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-xl bg-[#F7F7F5] p-2">
               <span className="block text-[#6F6F6F]">Department</span>
-              <strong className="text-[#0D0D0B]">{submittedIssue?.department || aiResult?.department || 'Assigning'}</strong>
+              <strong className="text-[#0D0D0B]">{submittedIssue?.department || aiResult?.department || (aiPollExhausted ? '—' : 'Assigning')}</strong>
             </div>
             <div className="rounded-xl bg-[#F7F7F5] p-2">
               <span className="block text-[#6F6F6F]">Severity</span>
