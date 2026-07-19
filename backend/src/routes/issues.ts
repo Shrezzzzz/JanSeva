@@ -276,7 +276,10 @@ export async function getAuthorityActivityHandler(req: Request, res: Response) {
   }
   
   if (user) {
-    const authorityWhere = getAuthorityWhereClause(user);
+    const effectiveUser = ward && ward !== 'All' && ward !== 'City-Wide' && !user.ward
+      ? { ...user, ward }
+      : user;
+    const authorityWhere = getAuthorityWhereClause(effectiveUser);
     if (Object.keys(authorityWhere).length > 0) {
       where.issue = { ...((where.issue as any) || {}), ...authorityWhere };
     }
