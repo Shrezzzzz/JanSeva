@@ -16,16 +16,18 @@ const STEPS: { status: IssueStatus; label: string }[] = [
 ];
 
 const ORDER: Record<IssueStatus, number> = {
-  Reported:          0,
-  Verified:          1,
-  Assigned:          2,
-  Accepted:          3,
-  InProgress:        4,
-  Completed:         4, // same visual position as InProgress (sub-state)
-  NeedsVerification: 5,
-  Rejected:          4, // shown at InProgress position when rejected
-  Resolved:          6,
-  Closed:            7,
+  Reported:           0,
+  Verified:           1,
+  AwaitingAssignment: 1,
+  Assigned:           2,
+  Accepted:           3,
+  InProgress:         4,
+  Completed:          4,
+  NeedsVerification:  5,
+  Rejected:           4,
+  FlaggedFalse:       0,
+  Resolved:           6,
+  Closed:             7,
 };
 
 interface StatusPipelineProps {
@@ -35,8 +37,9 @@ interface StatusPipelineProps {
 export default function StatusPipeline({ status }: StatusPipelineProps) {
   const currentIdx = ORDER[status];
 
-  // For Rejected, show a warning tint on the pipeline
-  const isRejected = status === 'Rejected';
+  const isRejected     = status === 'Rejected';
+  const isFlaggedFalse = status === 'FlaggedFalse';
+  const isRedState     = isRejected || isFlaggedFalse;
 
   return (
     <div className="flex items-center w-full">
@@ -50,16 +53,16 @@ export default function StatusPipeline({ status }: StatusPipelineProps) {
               <div className={clsx(
                 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-all duration-300 shrink-0',
                 done    && 'bg-[#1A6B3C] border-[#1A6B3C] text-white',
-                active  && !isRejected && 'bg-[#1A6B3C] border-[#1A6B3C] text-white',
-                active  && isRejected  && 'bg-red-600 border-red-600 text-white',
+                active  && !isRedState && 'bg-[#1A6B3C] border-[#1A6B3C] text-white',
+                active  && isRedState  && 'bg-red-600 border-red-600 text-white',
                 pending && 'bg-white border-[#E5E5E0] text-[#6F6F6F]',
               )}>
                 {done ? <Check size={12} /> : <span>{i + 1}</span>}
               </div>
               <span className={clsx(
                 'text-[10px] hidden sm:block truncate max-w-[56px] text-center leading-tight',
-                active  && !isRejected && 'text-[#0D0D0B] font-semibold',
-                active  && isRejected  && 'text-red-600 font-semibold',
+                active  && !isRedState && 'text-[#0D0D0B] font-semibold',
+                active  && isRedState  && 'text-red-600 font-semibold',
                 !active && 'text-[#6F6F6F]',
               )}>
                 {step.label}

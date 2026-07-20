@@ -37,10 +37,11 @@ function getNavItems(role: string, email: string, ward?: string | null) {
   const isWard  = role === 'Authority' && !DEPT_EMAILS.has(email) && Boolean(ward && ward !== 'All');
 
   if (isWard) {
-    // Ward Officer: dedicated verification pages
+    // Ward Officer: pre-assignment review + post-completion verification
     return [
-      { label: '📊 Overview',           path: '/authority/ward/dashboard' },
-      { label: '🔍 Verification Queue', path: '/authority/ward/queue'     },
+      { label: '📊 Overview',            path: '/authority/ward/dashboard'     },
+      { label: '📋 Report Verification', path: '/authority/ward/report-review' },
+      { label: '✅ Work Verification',   path: '/authority/ward/queue'         },
     ];
   }
 
@@ -54,12 +55,13 @@ function getNavItems(role: string, email: string, ward?: string | null) {
 
   // City Admin: full access
   return [
-    { label: '📊 Overview',  path: '/authority/dashboard' },
-    { label: '📥 Inbox',     path: '/authority/inbox'     },
-    { label: '📋 My Cases',  path: '/authority/my-cases'  },
-    { label: '🗺️ By Zone',   path: '/authority/zones'     },
-    { label: '📈 Analytics', path: '/authority/analytics' },
-    { label: '👥 Team',      path: '/authority/team'      },
+    { label: '📊 Overview',        path: '/authority/dashboard'        },
+    { label: '📥 Inbox',           path: '/authority/inbox'            },
+    { label: '📋 My Cases',        path: '/authority/my-cases'         },
+    { label: '🗺️ By Zone',         path: '/authority/zones'            },
+    { label: '📈 Analytics',       path: '/authority/analytics'        },
+    { label: '👥 Team',            path: '/authority/team'             },
+    { label: '🚩 Flagged Reports', path: '/authority/flagged-reports'  },
   ];
 }
 
@@ -68,7 +70,11 @@ function getMobileNavItems(role: string, email: string, ward?: string | null) {
   const isDept  = role === 'Authority' && DEPT_EMAILS.has(email);
   const isWard  = role === 'Authority' && !DEPT_EMAILS.has(email) && Boolean(ward && ward !== 'All');
 
-  if (isWard)  return [{ icon: '📊', path: '/authority/ward/dashboard' }, { icon: '🔍', path: '/authority/ward/queue' }];
+  if (isWard)  return [
+    { icon: '📊', path: '/authority/ward/dashboard'     },
+    { icon: '📋', path: '/authority/ward/report-review' },
+    { icon: '✅', path: '/authority/ward/queue'         },
+  ];
   if (isDept)  return [{ icon: '📊', path: '/authority/dashboard' }, { icon: '📋', path: '/authority/my-cases' }];
   return [
     { icon: '📊', path: '/authority/dashboard' },

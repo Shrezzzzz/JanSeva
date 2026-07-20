@@ -52,16 +52,18 @@ export function severityColor(s: Severity): string {
 
 export function statusColor(s: IssueStatus): string {
   const map: Record<IssueStatus, string> = {
-    Reported:          'text-gray-600 bg-gray-100',
-    Verified:          'text-blue-600 bg-blue-50',
-    Assigned:          'text-amber-600 bg-amber-50',
-    Accepted:          'text-purple-600 bg-purple-50',
-    InProgress:        'text-orange-600 bg-orange-50',
-    Completed:         'text-cyan-600 bg-cyan-50',
-    NeedsVerification: 'text-orange-700 bg-orange-100',
-    Rejected:          'text-red-600 bg-red-50',
-    Resolved:          'text-green-600 bg-green-50',
-    Closed:            'text-gray-500 bg-gray-100',
+    Reported:           'text-gray-600 bg-gray-100',
+    Verified:           'text-blue-600 bg-blue-50',
+    AwaitingAssignment: 'text-indigo-600 bg-indigo-50',
+    FlaggedFalse:       'text-red-600 bg-red-50',
+    Assigned:           'text-amber-600 bg-amber-50',
+    Accepted:           'text-purple-600 bg-purple-50',
+    InProgress:         'text-orange-600 bg-orange-50',
+    Completed:          'text-cyan-600 bg-cyan-50',
+    NeedsVerification:  'text-orange-700 bg-orange-100',
+    Rejected:           'text-red-600 bg-red-50',
+    Resolved:           'text-green-600 bg-green-50',
+    Closed:             'text-gray-500 bg-gray-100',
   };
   return map[s];
 }

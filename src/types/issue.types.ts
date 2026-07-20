@@ -13,6 +13,8 @@ export type Severity = 'Low' | 'Medium' | 'High' | 'Critical';
 export type IssueStatus =
   | 'Reported'
   | 'Verified'
+  | 'AwaitingAssignment'
+  | 'FlaggedFalse'
   | 'Assigned'
   | 'Accepted'
   | 'InProgress'
@@ -111,6 +113,7 @@ export interface Issue {
   aiAnalyzedAt?: string;
   aiFailureReason?: string;
   assignedTo?: string;
+  wardFlagNote?: string;
   completionNotes?: string;
   completionPhotos?: string[];
   comments?: Comment[];
@@ -166,14 +169,16 @@ export const CATEGORY_ICONS: Record<Category, string> = {
 };
 
 export const STATUS_COLORS: Record<IssueStatus, string> = {
-  Reported:          '#9CA3AF',
-  Verified:          '#0284C7',
-  Assigned:          '#D97706',
-  Accepted:          '#7C3AED',
-  InProgress:        '#F59E0B',
-  Completed:         '#0891B2',
-  NeedsVerification: '#EA580C',
-  Rejected:          '#DC2626',
-  Resolved:          '#1A6B3C',
-  Closed:            '#6B7280',
+  Reported:           '#9CA3AF',
+  Verified:           '#0284C7',
+  AwaitingAssignment: '#6366F1',
+  FlaggedFalse:       '#DC2626',
+  Assigned:           '#D97706',
+  Accepted:           '#7C3AED',
+  InProgress:         '#F59E0B',
+  Completed:          '#0891B2',
+  NeedsVerification:  '#EA580C',
+  Rejected:           '#DC2626',
+  Resolved:           '#1A6B3C',
+  Closed:             '#6B7280',
 };

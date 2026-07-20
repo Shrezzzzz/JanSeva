@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
 import Layout from './components/layout/Layout';
 import Spinner from './components/ui/Spinner';
 import { ROUTES } from './config/routes';
+import { useAuth } from './hooks/useAuth';
 
 import AuthorityLoginPage    from './pages/AuthorityLoginPage';
 import AuthorityDashboard    from './pages/authority/AuthorityDashboard';
@@ -10,8 +11,10 @@ import IssueInbox            from './pages/authority/IssueInbox';
 import AuthorityLayout       from './components/layout/AuthorityLayout';
 import AuthorityAnalytics    from './pages/authority/AuthorityAnalytics';
 import AuthorityTeam         from './pages/authority/AuthorityTeam';
+import FlaggedReportsPage    from './pages/authority/FlaggedReportsPage';
 import WardOfficerDashboard  from './pages/authority/ward/WardOfficerDashboard';
 import VerificationQueue     from './pages/authority/ward/VerificationQueue';
+import ReportReviewQueue     from './pages/authority/ward/ReportReviewQueue';
 
 const PublicLandingPage = lazy(() => import('./pages/PublicLandingPage'));
 const LandingPage      = lazy(() => import('./pages/LandingPage'));
@@ -43,6 +46,22 @@ function KeyedReportPage() {
   return <Page key={key} />;
 }
 
+// Redirects non-Admin authority users away from Admin-only routes.
+// AuthorityLayout ensures the user is Authority or Admin; this adds the
+// second check so typing /authority/flagged-reports directly doesn't
+// render reporter PII for a ward/dept officer.
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (user && user.role !== 'Admin') {
+      navigate('/authority/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
+  if (!user || user.role !== 'Admin') return null;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -63,8 +82,10 @@ export default function App() {
             <Route path="analytics" element={<AuthorityAnalytics />} />
             <Route path="team"      element={<AuthorityTeam />} />
             {/* Ward Officer dedicated pages */}
-            <Route path="ward/dashboard" element={<WardOfficerDashboard />} />
-            <Route path="ward/queue"     element={<VerificationQueue />} />
+            <Route path="ward/dashboard"    element={<WardOfficerDashboard />} />
+            <Route path="ward/queue"        element={<VerificationQueue />} />
+            <Route path="ward/report-review" element={<ReportReviewQueue />} />
+            <Route path="flagged-reports"   element={<AdminGuard><FlaggedReportsPage /></AdminGuard>} />
           </Route>
 
           <Route element={<Layout />}>
