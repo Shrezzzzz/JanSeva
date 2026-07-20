@@ -228,3 +228,21 @@ export function getAuthorityWhereClause(
 
   return { OR: accessWhere };
 }
+
+/**
+ * Builds the WHERE clause for the ward officer's Report Review queue:
+ * Reported issues in their ward, awaiting pre-assignment review.
+ * City Admin (role Admin or ward City-Wide) sees all Reported issues — no zone filter.
+ * Kept separate from getAuthorityWhereClause (which targets NeedsVerification).
+ */
+export function getReportReviewWhereClause(
+  user: Pick<User, 'role' | 'ward'>,
+): Prisma.IssueWhereInput {
+  if (isCityAdmin(user)) {
+    return { status: 'Reported' };
+  }
+  return {
+    zone:   user.ward!,
+    status: 'Reported',
+  };
+}

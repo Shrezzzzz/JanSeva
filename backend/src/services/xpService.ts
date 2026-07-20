@@ -73,3 +73,27 @@ async function checkAndAwardBadges(userId: string, xp: number) {
     });
   }
 }
+
+export async function deductXP(userId: string, amount: number) {
+  // Fetch current XP first so we can apply the floor-at-zero correctly.
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { xp: true, level: true },
+  });
+  if (!current) return;
+
+  const newXP = Math.max(0, current.xp - amount);
+  const user  = await prisma.user.update({
+    where: { id: userId },
+    data:  { xp: newXP },
+  });
+
+  const newLevel = levelFromXP(user.xp);
+  if (newLevel !== user.level) {
+    await prisma.user.update({
+      where: { id: userId },
+      data:  { level: newLevel },
+    });
+  }
+  return user;
+}

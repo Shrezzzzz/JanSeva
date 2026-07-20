@@ -116,6 +116,24 @@ export async function createIssue(req: AuthRequest, res: Response) {
     if (!isValidCoords(latitude, longitude))
       return res.status(400).json({ success: false, error: 'Invalid coordinates' });
 
+    // Block suspended citizens from submitting new reports.
+    // Does not block anonymous submissions (no userId) or login/viewing.
+    if (req.userId) {
+      const reporter = await prisma.user.findUnique({
+        where:  { id: req.userId },
+        select: { suspendedUntil: true },
+      });
+      if (reporter?.suspendedUntil && reporter.suspendedUntil > new Date()) {
+        const until = reporter.suspendedUntil.toLocaleDateString('en-IN', {
+          day: 'numeric', month: 'long', year: 'numeric',
+        });
+        return res.status(403).json({
+          success: false,
+          error: `Your account has been suspended until ${until}. You cannot submit new reports during this period.`,
+        });
+      }
+    }
+
     const issue = await prisma.issue.create({
       data: {
         title, description, category, severity, latitude, longitude,

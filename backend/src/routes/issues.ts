@@ -690,6 +690,147 @@ router.post('/:id/verify-reject', authMiddleware, requireRole(['Authority', 'Adm
   }
 });
 
+/**
+ * POST /api/issues/:id/ward-verify-true
+ * Ward Officer confirms the report is legitimate.
+ * Reported → AwaitingAssignment
+ */
+router.post('/:id/ward-verify-true', authMiddleware, requireRole(['Authority', 'Admin']), async (req, res) => {
+  const authReq = req as AuthRequest;
+  try {
+    const user = await prisma.user.findUnique({
+      where:  { id: authReq.userId! },
+      select: { email: true, role: true, ward: true },
+    });
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorised' });
+
+    const { isWardOfficer: _isWO, isCityAdmin: _isAdmin } = await import('../services/authorityAssignmentService');
+    const wardParam = typeof req.query.ward === 'string' && req.query.ward.trim() ? req.query.ward.trim() : null;
+    const effectiveUser = wardParam && !user.ward ? { ...user, ward: wardParam } : user;
+
+    if (!_isWO(effectiveUser) && !_isAdmin(effectiveUser)) {
+      return res.status(403).json({ success: false, error: 'Only Ward Officers can verify reports' });
+    }
+
+    const issue = await prisma.issue.findUnique({ where: { id: req.params.id } });
+    if (!issue) return res.status(404).json({ success: false, error: 'Issue not found' });
+    if (issue.status !== 'Reported') {
+      return res.status(409).json({ success: false, error: `Can only verify a Reported issue (current: ${issue.status})` });
+    }
+    if (_isWO(effectiveUser) && issue.zone !== effectiveUser.ward) {
+      return res.status(403).json({ success: false, error: 'This issue is not in your ward' });
+    }
+
+    const updated = await prisma.issue.update({
+      where: { id: req.params.id },
+      data:  { status: 'AwaitingAssignment' },
+    });
+    await prisma.timeline.create({
+      data: {
+        issueId:   issue.id,
+        event:     'Report Verified by Ward Officer',
+        actor:     authReq.userName!,
+        actorRole: 'Authority',
+        note:      'Ward Officer confirmed this is a legitimate civic issue',
+      },
+    });
+    return res.json({ success: true, data: updated });
+  } catch (e) {
+    console.error('ward-verify-true error:', e);
+    return res.status(500).json({ success: false, error: 'Failed to verify report' });
+  }
+});
+
+/**
+ * POST /api/issues/:id/ward-verify-false
+ * Ward Officer flags the report as false/invalid.
+ * Reported → FlaggedFalse
+ * Body: { flagNote: string }
+ */
+router.post('/:id/ward-verify-false', authMiddleware, requireRole(['Authority', 'Admin']), async (req, res) => {
+  const authReq = req as AuthRequest;
+  try {
+    const { flagNote } = req.body;
+    if (!flagNote?.trim()) {
+      return res.status(400).json({ success: false, error: 'flagNote is required when flagging a false report' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where:  { id: authReq.userId! },
+      select: { email: true, role: true, ward: true },
+    });
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorised' });
+
+    const { isWardOfficer: _isWO, isCityAdmin: _isAdmin } = await import('../services/authorityAssignmentService');
+    const wardParam = typeof req.query.ward === 'string' && req.query.ward.trim() ? req.query.ward.trim() : null;
+    const effectiveUser = wardParam && !user.ward ? { ...user, ward: wardParam } : user;
+
+    if (!_isWO(effectiveUser) && !_isAdmin(effectiveUser)) {
+      return res.status(403).json({ success: false, error: 'Only Ward Officers can flag false reports' });
+    }
+
+    const issue = await prisma.issue.findUnique({ where: { id: req.params.id } });
+    if (!issue) return res.status(404).json({ success: false, error: 'Issue not found' });
+    if (issue.status !== 'Reported') {
+      return res.status(409).json({ success: false, error: `Can only flag a Reported issue (current: ${issue.status})` });
+    }
+    if (_isWO(effectiveUser) && issue.zone !== effectiveUser.ward) {
+      return res.status(403).json({ success: false, error: 'This issue is not in your ward' });
+    }
+
+    const updated = await prisma.issue.update({
+      where: { id: req.params.id },
+      data:  { status: 'FlaggedFalse', wardFlagNote: flagNote.trim() },
+    });
+    await prisma.timeline.create({
+      data: {
+        issueId:   issue.id,
+        event:     'Report Flagged as False by Ward Officer',
+        actor:     authReq.userName!,
+        actorRole: 'Authority',
+        note:      flagNote.trim(),
+      },
+    });
+    return res.json({ success: true, data: updated });
+  } catch (e) {
+    console.error('ward-verify-false error:', e);
+    return res.status(500).json({ success: false, error: 'Failed to flag report' });
+  }
+});
+
+/**
+ * POST /api/issues/:id/restore-flagged
+ * City Admin restores a FlaggedFalse issue → AwaitingAssignment. No citizen penalty.
+ */
+router.post('/:id/restore-flagged', authMiddleware, requireRole(['Admin']), async (req, res) => {
+  const authReq = req as AuthRequest;
+  try {
+    const issue = await prisma.issue.findUnique({ where: { id: req.params.id } });
+    if (!issue) return res.status(404).json({ success: false, error: 'Issue not found' });
+    if (issue.status !== 'FlaggedFalse') {
+      return res.status(409).json({ success: false, error: `Can only restore a FlaggedFalse issue (current: ${issue.status})` });
+    }
+
+    const updated = await prisma.issue.update({
+      where: { id: req.params.id },
+      data:  { status: 'AwaitingAssignment', wardFlagNote: null },
+    });
+    await prisma.timeline.create({
+      data: {
+        issueId:   issue.id,
+        event:     'Flag Removed — Restored by City Admin',
+        actor:     authReq.userName!,
+        actorRole: 'Admin',
+        note:      req.body.note ?? 'City Admin reviewed and restored this report',
+      },
+    });
+    return res.json({ success: true, data: updated });
+  } catch (e) {
+    console.error('restore-flagged error:', e);
+    return res.status(500).json({ success: false, error: 'Failed to restore issue' });
+  }
+});
+
 // Reporter only — edit description/severity/media or delete their own issue
 router.patch('/:id',           authMiddleware, updateIssue);
 router.delete('/:id',          authMiddleware, deleteIssue);
@@ -829,4 +970,68 @@ export async function getWardStatsHandler(req: Request, res: Response) {
       })),
     },
   });
+}
+
+export async function getReportReviewQueueHandler(req: Request, res: Response) {
+  const authReq = req as AuthRequest;
+  const user = authReq.userId
+    ? await prisma.user.findUnique({
+        where:  { id: authReq.userId },
+        select: { email: true, role: true, ward: true },
+      })
+    : null;
+  if (!user) return res.status(401).json({ success: false, error: 'Please sign in to continue.' });
+
+  const wardParam = typeof req.query.ward === 'string'
+    && req.query.ward !== 'All'
+    && req.query.ward !== 'City-Wide'
+      ? req.query.ward
+      : null;
+  const effectiveUser = wardParam && !user.ward ? { ...user, ward: wardParam } : user;
+
+  const { getReportReviewWhereClause } = await import('../services/authorityAssignmentService');
+  const where = getReportReviewWhereClause(effectiveUser);
+
+  const page = parseInt(typeof req.query.page     === 'string' ? req.query.page     : '1');
+  const ps   = Math.min(parseInt(typeof req.query.pageSize === 'string' ? req.query.pageSize : '20'), 100);
+
+  const issues = await prisma.issue.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: ps,
+    skip: (page - 1) * ps,
+    select: {
+      id: true, title: true, description: true, category: true, severity: true,
+      status: true, latitude: true, longitude: true, address: true, zone: true,
+      mediaUrls: true, isAnonymous: true, reporterId: true, upvotes: true,
+      createdAt: true, updatedAt: true,
+      reporter: { select: { id: true, name: true, citizenId: true } },
+    },
+  });
+  return res.json({ success: true, data: issues });
+}
+
+export async function getFlaggedIssuesHandler(req: Request, res: Response) {
+  const page = parseInt(typeof req.query.page     === 'string' ? req.query.page     : '1');
+  const ps   = Math.min(parseInt(typeof req.query.pageSize === 'string' ? req.query.pageSize : '20'), 100);
+
+  const issues = await prisma.issue.findMany({
+    where:   { status: 'FlaggedFalse' },
+    orderBy: { updatedAt: 'desc' },
+    take: ps,
+    skip: (page - 1) * ps,
+    select: {
+      id: true, title: true, category: true, severity: true,
+      zone: true, address: true, wardFlagNote: true,
+      isAnonymous: true, reporterId: true,
+      createdAt: true, updatedAt: true,
+      reporter: {
+        select: {
+          id: true, name: true, email: true,
+          citizenId: true, xp: true, suspendedUntil: true,
+        },
+      },
+    },
+  });
+  return res.json({ success: true, data: issues });
 }
