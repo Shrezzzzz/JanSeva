@@ -120,7 +120,7 @@ export async function getAuthorityIssuesHandler(req: Request, res: Response) {
     if (scope === 'my_cases') {
       authorityWhere.status = { notIn: ['Reported', 'Verified'] as any };
     } else if (scope === 'inbox') {
-      authorityWhere.status = { in: ['Reported', 'Verified'] as any };
+      authorityWhere.status = { in: ['Reported', 'Verified', 'AwaitingAssignment'] as any };
     }
   }
 
